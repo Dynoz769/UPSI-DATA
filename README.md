@@ -2,13 +2,59 @@
 
 Storan fail peribadi, macam Google Drive versi ringkas. Upload fail kerja atau fail peribadi, susun dalam folder, buka dan muat turun dari mana-mana.
 
-- **Private**: kena log masuk. Fail hanya boleh diakses oleh akaun kau (bucket Supabase private + polisi keselamatan).
-- **Upload senang**: tekan **⬆ Upload Fail**, atau seret fail ke mana-mana bahagian skrin. Banyak fail sekali gus, maks 50MB setiap satu.
+- **Upload senang**: tekan **⬆ Upload Fail**, atau seret fail ke mana-mana bahagian skrin. Banyak fail sekali gus.
 - **Folder**: buat folder sendiri (cth. Kerja, Peribadi). Tukar nama atau padam folder.
 - **Urus fail**: buka, muat turun, tukar nama, pindah ke folder lain, padam.
 - **Pratonton gambar**, carian nama fail, dan susun ikut terbaru, nama atau saiz.
-- **Meter ruang**: tunjuk berapa banyak daripada 1GB percuma dah digunakan.
 - Bahasa Melayu, sesuai untuk telefon dan desktop, ada mod gelap.
+
+Ada dua versi:
+
+| | **Google Drive (Apps Script)** ← utama | Supabase (versi lama) |
+|---|---|---|
+| Folder | `apps-script/` | `public/`, `supabase/` |
+| Ruang | Ikut kuota Google Drive akaun kau | 1 GB percuma |
+| Saiz fail | Tiada had praktikal (dihantar dalam cebisan 8MB) | 50 MB |
+| Alamat | `script.google.com/macros/s/.../exec` | `dynoz769.github.io/UPSI-DATA` |
+
+---
+
+# Versi Google Drive (Apps Script)
+
+Fail disimpan dalam folder **`UPSI-DATA`** di My Drive akaun Google kau. Setiap subfolder di dalamnya ialah satu folder dalam website. Kau juga boleh buka folder tu terus dalam Google Drive.
+
+Website ni berjalan sebagai **akaun kau sendiri** dan ditetapkan **"Only myself"**, jadi hanya kau yang boleh buka.
+
+## Cara setup (±5 minit)
+
+1. Buka <https://script.google.com> dan log masuk dengan akaun Google yang nak digunakan (cth. akaun MOE).
+2. Tekan **New project**. Tukar nama projek (atas kiri) kepada `UPSI-DATA`.
+3. Dalam fail **`Code.gs`**: padam semua isi, kemudian salin dan tampal isi [`apps-script/Code.gs`](apps-script/Code.gs).
+4. Tekan **+** di sebelah *Files* → **HTML** → namakan **`Index`** (tanpa `.html`). Padam isi, kemudian salin dan tampal isi [`apps-script/Index.html`](apps-script/Index.html).
+5. Tekan 💾 **Save**.
+6. Tekan **Deploy → New deployment** → ikon ⚙️ → **Web app**, dan tetapkan:
+   - **Execute as**: *Me*
+   - **Who has access**: *Only myself*
+7. Tekan **Deploy** → **Authorize access** → pilih akaun kau.
+   Kalau keluar *"Google hasn't verified this app"*: tekan **Advanced → Go to UPSI-DATA (unsafe)** → **Allow**. Ini normal sebab app ni kau buat sendiri.
+8. Salin **Web app URL** (`https://script.google.com/macros/s/.../exec`) dan **bookmark**. Itulah website kau.
+
+### Bila kod dikemas kini
+Tampal kod baru → **Save** → **Deploy → Manage deployments** → ✏️ → **Version: New version** → **Deploy**. URL kekal sama.
+
+## Masalah biasa
+- **"Maaf, tidak dapat membuka fail pada masa ini"**: browser kau login lebih dari satu akaun Google. Buka URL dalam tetingkap Incognito dan login akaun tu sahaja, atau guna profil Chrome berasingan.
+- **Akses disekat / "app is blocked"**: admin akaun sekolah/organisasi mungkin sekat Apps Script. Cuba guna akaun Gmail peribadi.
+- **Upload lambat untuk fail besar**: fail dihantar dalam cebisan 8MB melalui Google. Fail ratusan MB boleh ambil beberapa minit.
+
+## ⚠️ Nota akaun MOE / DELIMa
+- Akaun ni milik KPM. Admin boleh akses fail, dan akaun mungkin **dipadam bila kau tamat sekolah**. Simpan salinan fail penting di tempat lain juga.
+- Kuota ruang ditetapkan oleh admin. Semak di <https://drive.google.com/settings/storage>.
+- Fail yang dipadam masuk **Sampah Google Drive** dan boleh dipulihkan dalam 30 hari.
+
+---
+
+# Versi Supabase (lama)
 
 ## Struktur
 
