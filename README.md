@@ -2,8 +2,9 @@
 
 Storan fail peribadi, macam Google Drive versi ringkas. Upload fail kerja atau fail peribadi, susun dalam folder, buka dan muat turun dari mana-mana.
 
-- **Profil macam Netflix** (versi Google Drive): tiada login. Pilih profil dulu, tambah atau padam profil, dan kunci profil dengan PIN 4 digit kalau nak.
-- **Upload senang**: tekan **⬆ Upload Fail**, atau seret fail ke mana-mana bahagian skrin. Banyak fail sekali gus.
+- **Profil macam Netflix** (versi Google Drive): tiada login. Pilih profil dulu, tambah, edit atau padam profil, letak **gambar profil** sendiri, dan kunci profil dengan PIN 4 digit kalau nak.
+- **Upload senang**: tekan **⬆ Upload Fail** atau **📁 Upload Folder**, atau seret fail/folder ke mana-mana bahagian skrin.
+- **Pratonton folder**: halaman utama tunjuk setiap folder sebagai kad dengan pratonton sehingga 4 gambar di dalamnya.
 - **Folder**: buat folder sendiri (cth. Kerja, Peribadi). Tukar nama atau padam folder.
 - **Urus fail**: buka, muat turun, tukar nama, pindah ke folder lain, padam.
 - **Pratonton gambar**, carian nama fail, dan susun ikut terbaru, nama atau saiz.
@@ -31,9 +32,12 @@ UPSI-DATA/
       laporan.pdf
   Sara/
     ...
+  _gambar-profil/  ← gambar profil (dikecilkan ke 256px)
 ```
 
-Bila website dibuka, skrin **"Siapa yang guna?"** keluar dan kau pilih profil. Setiap profil hanya nampak fail sendiri. Tekan **Tambah Profil** untuk buat profil baru (nama, ikon, warna, PIN pilihan), atau **Urus Profil** untuk padam profil.
+Bila website dibuka, skrin **"Siapa yang guna?"** keluar dan kau pilih profil. Setiap profil hanya nampak fail sendiri. Tekan **Tambah Profil** untuk buat profil baru (nama, gambar atau ikon, warna, PIN pilihan). Tekan **Urus Profil** dan pilih profil untuk tukar nama/gambar atau padam profil (perlu PIN kalau profil berkunci).
+
+**Upload Folder**: folder yang dipilih atau diseret jadi folder dengan nama sama dalam profil. Subfolder diratakan, cth. `hari2/hutan.png` jadi `hari2 - hutan.png`.
 
 ### 🔒 Keselamatan
 - Website ni **tiada login**. Sesiapa yang ada link website boleh buka skrin profil.
