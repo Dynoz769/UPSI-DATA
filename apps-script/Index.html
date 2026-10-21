@@ -320,6 +320,17 @@ a.btn { display: inline-flex; align-items: center; text-decoration: none; }
   .grid-folder { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .alat #btn-upload-folder { flex: 1 1 calc(50% - 4px); }
 }
+
+/* Siapa yang buat / upload */
+.saya { margin-top: 18px; }
+.saya-header {
+  margin-left: auto; margin-right: 8px; min-width: 0; max-width: 34vw;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.oleh-profil { font-size: .75rem; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.info-dibuat { text-align: center; margin: 0 0 4px; }
+.kad-meta .oleh { flex-basis: 100%; }
+@media (max-width: 720px) { .saya-header { display: none; } }
   </style>
 </head>
 <body>
@@ -329,12 +340,14 @@ a.btn { display: inline-flex; align-items: center; text-decoration: none; }
     <h1 id="tajuk-profil">Siapa yang guna?</h1>
     <div id="grid-profil" class="grid-profil"><p class="pudar">Memuatkan…</p></div>
     <button id="btn-urus-profil" class="btn btn-urus" hidden>Urus Profil</button>
+    <p id="saya-profil" class="pudar kecil saya"></p>
   </section>
 
   <!-- Skrin: fail -->
   <section id="skrin-utama" class="skrin" hidden>
   <header class="atas">
     <div class="jenama">📁 UPSI-DATA</div>
+    <span id="saya-header" class="pudar kecil saya-header"></span>
     <button id="btn-tukar-profil" class="profil-kecil" title="Tukar profil">
       <span id="avatar-kecil" class="avatar avatar-kecil"></span>
       <span id="nama-profil-kecil"></span>
@@ -438,6 +451,7 @@ a.btn { display: inline-flex; align-items: center; text-decoration: none; }
           <input id="input-gambar-profil" type="file" accept="image/*" hidden>
         </div>
       </div>
+      <p id="info-dibuat" class="pudar kecil info-dibuat" hidden></p>
       <label>Nama
         <input name="nama" required maxlength="30" autocomplete="off" placeholder="cth: Adam">
       </label>
@@ -493,6 +507,7 @@ a.btn { display: inline-flex; align-items: center; text-decoration: none; }
   const $ = (s, el = document) => el.querySelector(s);
 
   let token = '';
+  let saya = { emel: '', id: '' }; // siapa yang sedang guna website ni
   let profilAktif = null;  // { id, nama, ikon, warna, adaPin }
   let profilList = [];
   let modUrus = false;
@@ -573,6 +588,24 @@ a.btn { display: inline-flex; align-items: center; text-decoration: none; }
     ? el('span', { class: `avatar ada-gambar ${kelas}`, style: `background-color:${p.warna};background-image:url("${p.gambar}")`, role: 'img', 'aria-label': p.nama || 'Gambar profil' })
     : el('span', { class: `avatar ${kelas}`, style: `background:${p.warna}` }, p.ikon));
 
+  // Email, atau "Tanpa nama #kod" untuk akaun yang Google tak dedahkan emelnya
+  const labelOleh = (o) => {
+    if (!o) return '';
+    const m = /^tanpa-nama-(.+)$/.exec(o);
+    return m ? `Tanpa nama #${m[1]}` : o;
+  };
+  const olehSpan = (o) => o && el('span', { class: 'oleh', title: `Oleh ${labelOleh(o)}` }, `👤 ${labelOleh(o)}`);
+
+  async function kenalPasti() {
+    try { saya = await panggilTerus('siapaSaya'); } catch { /* biarkan kosong */ }
+    const teks = saya.emel
+      ? `Anda: ${saya.emel}`
+      : `Anda: ${labelOleh(saya.id) || 'tidak dikenal pasti'} (Google tak dedahkan email akaun ni)`;
+    $('#saya-profil').textContent = teks;
+    $('#saya-header').textContent = saya.emel || labelOleh(saya.id);
+    $('#saya-header').title = teks;
+  }
+
   const namaFolder = (id) => (id === akarId ? 'Utama' : (folders.find((f) => f.id === id)?.nama || '?'));
 
   let toastTimer;
@@ -619,6 +652,7 @@ a.btn { display: inline-flex; align-items: center; text-decoration: none; }
       },
         el('span', { class: 'avatar-bungkus' }, avatar(p), modUrus && el('span', { class: 'avatar-padam' }, '✏️')),
         el('span', { class: 'nama-profil' }, p.nama, p.adaPin && el('span', { class: 'kunci', title: 'Dikunci dengan PIN' }, ' 🔒')),
+        modUrus && p.dibuatOleh && el('span', { class: 'oleh-profil', title: `Dibuat oleh ${labelOleh(p.dibuatOleh)}` }, labelOleh(p.dibuatOleh)),
       )),
       !modUrus && profilList.length < 10 && el('button', { class: 'kad-profil', onclick: bukaTambahProfil },
         el('span', { class: 'avatar avatar-tambah' }, '+'),
@@ -726,6 +760,11 @@ a.btn { display: inline-flex; align-items: center; text-decoration: none; }
     $('#btn-simpan-profil').textContent = p ? 'Simpan' : 'Tambah';
     $('#btn-padam-profil').hidden = !p;
     $('#bahagian-pin-profil').hidden = !!p;
+    const info = $('#info-dibuat');
+    info.hidden = !(p && (p.dibuatOleh || p.dibuatPada));
+    if (!info.hidden) {
+      info.textContent = `Dibuat${p.dibuatOleh ? ` oleh ${labelOleh(p.dibuatOleh)}` : ''}${p.dibuatPada ? ` pada ${tarikh(p.dibuatPada)}` : ''}`;
+    }
     $('#ralat-profil').hidden = true;
     paparPilihanProfil();
     $('#dialog-profil').showModal();
@@ -977,6 +1016,7 @@ a.btn { display: inline-flex; align-items: center; text-decoration: none; }
         el('div', { class: 'kad-meta pudar' },
           el('span', {}, `${isiFolder.length} fail`),
           jumlah > 0 && el('span', {}, saiz(jumlah)),
+          olehSpan(folder.oleh),
         ),
       ),
     );
@@ -991,6 +1031,7 @@ a.btn { display: inline-flex; align-items: center; text-decoration: none; }
           f.folderId !== (folderAktif || akarId) && el('span', {}, `📁 ${namaFolder(f.folderId)}`),
           f.saiz > 0 && el('span', {}, saiz(f.saiz)),
           el('span', {}, tarikh(f.tarikh)),
+          olehSpan(f.oleh),
         ),
         el('div', { class: 'kad-aksi' },
           el('button', { class: 'btn ikon', title: 'Muat turun', 'aria-label': 'Muat turun', onclick: () => muatTurun(f) }, '⬇️'),
@@ -1358,6 +1399,7 @@ a.btn { display: inline-flex; align-items: center; text-decoration: none; }
     else bukaUpload(items);
   });
 
+  kenalPasti();
   muatProfil();
 })();
   </script>

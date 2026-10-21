@@ -39,6 +39,15 @@ Bila website dibuka, skrin **"Siapa yang guna?"** keluar dan kau pilih profil. S
 
 **Upload Folder**: folder yang dipilih atau diseret jadi folder dengan nama sama dalam profil. Subfolder diratakan, cth. `hari2/hutan.png` jadi `hari2 - hutan.png`.
 
+### 👤 Siapa buat / upload
+Setiap profil, folder dan fail direkod **siapa yang buat atau upload**. Rekod ni dipaparkan dalam website (👤 pada kad, "Dibuat oleh" dalam Edit Profil) dan juga disimpan dalam *description* fail/folder di Google Drive.
+
+Disebabkan web app berjalan sebagai "Execute as: Me", Google **hanya dedahkan email** untuk:
+- pemilik script, dan
+- akaun dari **domain yang sama** dengan pemilik (cth. semua `@moe-dl.edu.my` kalau di-deploy dengan akaun MOE).
+
+Untuk akaun lain (cth. Gmail biasa), email disorok oleh Google. Website rekod **"Tanpa nama #kod"**: kod yang sama untuk orang yang sama, jadi masih boleh dibezakan siapa upload apa. Fail lama sebelum ciri ni tiada rekod.
+
 ### 🔒 Keselamatan
 - Website ni **tiada login**. Sesiapa yang ada link website boleh buka skrin profil.
 - Profil **tanpa PIN** boleh dibuka sesiapa yang ada link. Untuk fail peribadi, **letak PIN**.

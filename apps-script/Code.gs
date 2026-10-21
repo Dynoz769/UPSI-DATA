@@ -79,6 +79,30 @@ function cache_() {
   return CacheService.getScriptCache();
 }
 
+// ---------- Siapa pengguna ni? ----------
+// Google hanya beri email pelawat bila dia pemilik script atau dari domain yang sama
+// (cth. semua @moe-dl.edu.my kalau script di-deploy dengan akaun MOE). Untuk akaun lain,
+// guna kunci tanpa nama yang tetap untuk orang yang sama, supaya masih boleh dibezakan.
+function pengguna_() {
+  let emel = '';
+  let kunci = '';
+  try { emel = Session.getActiveUser().getEmail() || ''; } catch (e) { /* tiada akses */ }
+  if (!emel) {
+    try { kunci = Session.getTemporaryActiveUserKey() || ''; } catch (e) { /* tiada akses */ }
+  }
+  return { emel: emel, id: kunci ? 'tanpa-nama-' + hash_(kunci).replace(/[^A-Za-z0-9]/g, '').slice(0, 6) : '' };
+}
+
+// Label untuk disimpan: email, atau kod tanpa nama
+function labelPengguna_() {
+  const u = pengguna_();
+  return u.emel || u.id || 'tidak diketahui';
+}
+
+function siapaSaya() {
+  return pengguna_();
+}
+
 // ---------- Profil ----------
 
 function profilSemua_() {
@@ -90,7 +114,11 @@ function simpanProfil_(list) {
 }
 
 function awam_(p) {
-  return { id: p.id, nama: p.nama, ikon: p.ikon, warna: p.warna, adaPin: !!p.pin, gambar: p.gambarId ? dataGambar_(p.gambarId) : '' };
+  return {
+    id: p.id, nama: p.nama, ikon: p.ikon, warna: p.warna, adaPin: !!p.pin,
+    gambar: p.gambarId ? dataGambar_(p.gambarId) : '',
+    dibuatOleh: p.dibuatOleh || '', dibuatPada: p.dibuatPada || '',
+  };
 }
 
 // ---------- Gambar profil (disimpan dalam UPSI-DATA/_gambar-profil) ----------
@@ -178,9 +206,14 @@ function tambahProfil(nama, ikon, warna, pin, gambar) {
     const list = profilSemua_().filter(folderProfilWujud_);
     if (list.length >= MAKS_PROFIL) throw new Error('Maksimum ' + MAKS_PROFIL + ' profil.');
     if (list.some(function (p) { return p.nama.toLowerCase() === nama.toLowerCase(); })) throw new Error('Nama profil tu dah wujud.');
+    const oleh = labelPengguna_();
     const folder = akar_().createFolder(nama);
+    folder.setDescription('Profil UPSI-DATA dibuat oleh ' + oleh);
     const salt = Utilities.getUuid();
-    const p = { id: folder.getId(), nama: nama, ikon: ikon, warna: warna, salt: salt, pin: pin ? hash_(salt + ':' + pin) : '', gambarId: '' };
+    const p = {
+      id: folder.getId(), nama: nama, ikon: ikon, warna: warna, salt: salt, pin: pin ? hash_(salt + ':' + pin) : '', gambarId: '',
+      dibuatOleh: oleh, dibuatPada: new Date().toISOString(),
+    };
     if (gambar) p.gambarId = simpanGambar_(gambar, p.id + '.jpg');
     list.push(p);
     simpanProfil_(list);
@@ -291,7 +324,8 @@ function senarai(token) {
   const it = asas.getFolders();
   while (it.hasNext()) {
     const f = it.next();
-    folders.push({ id: f.getId(), nama: f.getName() });
+    const m = /dibuat oleh (\S+)/i.exec(f.getDescription() || '');
+    folders.push({ id: f.getId(), nama: f.getName(), oleh: m ? m[1] : '' });
   }
 
   const ids = [asas.getId()].concat(folders.map(function (f) { return f.id; }));
@@ -306,7 +340,7 @@ function senarai(token) {
         q: q,
         pageSize: 1000,
         pageToken: halaman,
-        fields: 'nextPageToken,files(id,name,mimeType,size,createdTime,parents,thumbnailLink)',
+        fields: 'nextPageToken,files(id,name,mimeType,size,createdTime,parents,thumbnailLink,properties)',
       });
       const data = JSON.parse(api_('get', url).getContentText());
       (data.files || []).forEach(function (f) {
@@ -318,6 +352,7 @@ function senarai(token) {
           tarikh: f.createdTime,
           folderId: (f.parents || []).filter(function (p) { return kump.indexOf(p) >= 0; })[0] || asas.getId(),
           thumb: f.thumbnailLink || '',
+          oleh: (f.properties && f.properties.diuploadOleh) || '',
         });
       });
       halaman = data.nextPageToken || '';
@@ -336,13 +371,19 @@ function senarai(token) {
 function mulaUpload(token, folderId, nama, jenis, saiz) {
   const asas = profil_(token);
   const folder = folderDalam_(asas, folderId);
+  const oleh = labelPengguna_();
   const res = api_('post', UPLOAD_API + '?uploadType=resumable&fields=id', {
     contentType: 'application/json; charset=UTF-8',
     headers: {
       'X-Upload-Content-Type': jenis || 'application/octet-stream',
       'X-Upload-Content-Length': String(saiz),
     },
-    payload: JSON.stringify({ name: namaBersih_(nama), parents: [folder.getId()] }),
+    payload: JSON.stringify({
+      name: namaBersih_(nama),
+      parents: [folder.getId()],
+      description: 'Diupload melalui UPSI-DATA oleh ' + oleh,
+      properties: { diuploadOleh: oleh.slice(0, 100) },
+    }),
   });
   const h = res.getAllHeaders();
   const sesi = h.Location || h.location;
@@ -420,7 +461,10 @@ function folderBaru(token, nama) {
   nama = namaBersih_(nama);
   const asas = profil_(token);
   const ada = asas.getFoldersByName(nama);
-  return (ada.hasNext() ? ada.next() : asas.createFolder(nama)).getId();
+  if (ada.hasNext()) return ada.next().getId();
+  const f = asas.createFolder(nama);
+  f.setDescription('Folder UPSI-DATA dibuat oleh ' + labelPengguna_());
+  return f.getId();
 }
 
 function tukarNamaFolder(token, id, nama) {
