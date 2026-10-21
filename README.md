@@ -1,12 +1,13 @@
-# 📚 UPSI-DATA
+# 📁 UPSI-DATA
 
-Website peribadi untuk simpan dan urus assignment UPSI dan barang-barang lain (nota kuliah, slaid, sijil, dokumen peribadi, gambar, projek), lengkap dengan fail (PDF, Word, slide, gambar, zip).
+Storan fail peribadi, macam Google Drive versi ringkas. Upload fail kerja atau fail peribadi, susun dalam folder, buka dan muat turun dari mana-mana.
 
-- **Private**: kena log masuk. Data dan fail hanya boleh diakses oleh akaun kau (Supabase Row Level Security + bucket private).
-- **Upload terus dari website**: seret dan lepas fail, banyak fail sekali gus (maks 50MB setiap satu).
-- **Kategori**: tab untuk setiap kategori. Pilih dari senarai atau taip kategori baru sendiri. Medan tarikh hantar, status dan markah hanya untuk kategori *Tugasan*.
-- **Carian & tapisan**: ikut kategori, semester, status, kod kursus, tag, nama fail.
-- **Peringatan tarikh**: tugasan yang lewat atau tinggal ≤ 3 hari ditanda.
+- **Private**: kena log masuk. Fail hanya boleh diakses oleh akaun kau (bucket Supabase private + polisi keselamatan).
+- **Upload senang**: tekan **⬆ Upload Fail**, atau seret fail ke mana-mana bahagian skrin. Banyak fail sekali gus, maks 50MB setiap satu.
+- **Folder**: buat folder sendiri (cth. Kerja, Peribadi). Tukar nama atau padam folder.
+- **Urus fail**: buka, muat turun, tukar nama, pindah ke folder lain, padam.
+- **Pratonton gambar**, carian nama fail, dan susun ikut terbaru, nama atau saiz.
+- **Meter ruang**: tunjuk berapa banyak daripada 1GB percuma dah digunakan.
 - Bahasa Melayu, sesuai untuk telefon dan desktop, ada mod gelap.
 
 ## Struktur
@@ -15,20 +16,20 @@ Website peribadi untuk simpan dan urus assignment UPSI dan barang-barang lain (n
 public/            ← website (ini yang dihoskan)
   index.html
   css/style.css
-  js/config.js     ← isi URL & key Supabase di sini
+  js/config.js     ← URL & key Supabase
   js/app.js
-supabase/setup.sql ← skrip database + storage (projek baru)
-supabase/02-kategori.sql ← kemas kini untuk projek yang dibuat sebelum ada kategori
+supabase/setup.sql ← skrip setup database + storage
 .github/workflows/jekyll-gh-pages.yml ← deploy folder public/ ke GitHub Pages
 ```
+
+Fail disimpan dalam Supabase Storage di `<id pengguna>/<folder>/<nama fail>`. Tiada database diperlukan untuk fail.
 
 ## Cara setup (±15 minit, semua percuma)
 
 ### 1. Buat projek Supabase
 1. Daftar di <https://supabase.com> dan tekan **New project**. Pilih region **Southeast Asia (Singapore)**.
 2. Lepas projek siap, pergi ke **SQL Editor → New query**, salin semua isi `supabase/setup.sql`, dan tekan **Run**.
-   Skrip ni buat jadual `tugasan`, bucket private `fail-tugasan` dan semua polisi keselamatan.
-3. Kalau projek kau dibuat **sebelum** ada ciri kategori, jalankan juga `supabase/02-kategori.sql` dengan cara yang sama. Data lama kekal dan masuk kategori *Tugasan*.
+   Skrip ni buat bucket private `fail-tugasan` dan semua polisi keselamatan.
 
 ### 2. Buat akaun kau sendiri (dan tutup pendaftaran awam)
 1. **Authentication → Users → Add user → Create new user**. Masukkan emel + kata laluan, tandakan **Auto Confirm User**.
@@ -37,10 +38,9 @@ supabase/02-kategori.sql ← kemas kini untuk projek yang dibuat sebelum ada kat
 
 ### 3. Sambungkan website ke Supabase
 1. **Project Settings → API**: salin **Project URL** dan **anon public key**.
-2. Buka `public/js/config.js` dan gantikan `ISI_SUPABASE_URL` dan `ISI_SUPABASE_ANON_KEY`.
-   > Anon key memang direka untuk didedahkan dalam frontend. Data kau dilindungi oleh login + RLS, bukan oleh key ni.
+2. Masukkan dalam `public/js/config.js`.
+   > Anon key memang direka untuk didedahkan dalam frontend. Fail kau dilindungi oleh login + polisi keselamatan, bukan oleh key ni.
    > **Jangan sekali-kali** letak `service_role` key di sini.
-3. Commit dan push ke branch `main`.
 
 ### 4. Letak online
 **Pilihan A: GitHub Pages** (repo kena *public* untuk akaun GitHub percuma)
@@ -51,7 +51,7 @@ supabase/02-kategori.sql ← kemas kini untuk projek yang dibuat sebelum ada kat
 1. Sambungkan repo ni, tetapkan **Build command**: kosong, **Output directory**: `public`.
 2. Deploy. Dapat alamat macam `upsi-data.pages.dev`.
 
-> Kod website boleh nampak public, tapi tu tak apa: tanpa log masuk, tiada sesiapa boleh baca tugasan atau fail kau.
+> Kod website boleh nampak public, tapi tu tak apa: tanpa log masuk, tiada sesiapa boleh buka fail kau.
 
 ### 5. Tambah alamat website ke Supabase
 **Authentication → URL Configuration → Site URL**: masukkan alamat website kau (dari langkah 4).
@@ -64,5 +64,5 @@ python3 -m http.server 8000
 ```
 
 ## Had pelan percuma Supabase
-- Storage 1 GB, database 500 MB, fail maks 50 MB setiap satu.
-- Projek akan *pause* kalau tak digunakan 7 hari. Log masuk ke dashboard Supabase dan tekan **Restore** untuk hidupkan semula (data tak hilang).
+- Storage 1 GB, fail maks 50 MB setiap satu.
+- Projek akan *pause* kalau tak digunakan 7 hari. Log masuk ke dashboard Supabase dan tekan **Restore** untuk hidupkan semula (fail tak hilang).

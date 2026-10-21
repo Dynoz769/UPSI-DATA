@@ -1,22 +1,13 @@
 (() => {
   'use strict';
 
+  // Fail disimpan terus dalam Supabase Storage: <user_id>/<folder>/<nama fail>
   const BUCKET = 'fail-tugasan';
-  const STATUS_KELAS = {
-    'Belum Mula': 'st-belum',
-    'Dalam Proses': 'st-proses',
-    'Siap': 'st-siap',
-    'Dihantar': 'st-hantar',
-  };
-
-  // Cadangan kategori; kategori lain boleh ditaip sendiri dalam borang
-  const KATEGORI_ASAS = ['Tugasan', 'Nota Kuliah', 'Slaid', 'Sijil', 'Dokumen Peribadi', 'Gambar', 'Projek', 'Lain-lain'];
-  const IKON_KATEGORI = {
-    'Tugasan': '📝', 'Nota Kuliah': '📒', 'Slaid': '📊', 'Sijil': '🏅',
-    'Dokumen Peribadi': '🪪', 'Gambar': '🖼️', 'Projek': '🛠️', 'Lain-lain': '📦',
-  };
-  const ikonKat = (k) => IKON_KATEGORI[k] || '📁';
-  const TUGASAN = 'Tugasan';
+  const PLACEHOLDER = '.emptyFolderPlaceholder';
+  const HAD_FAIL = 50 * 1024 * 1024;
+  const HAD_RUANG = 1024 * 1024 * 1024; // pelan percuma Supabase: 1 GB
+  const FOLDER_CADANGAN = ['Kerja', 'Peribadi', 'Dokumen', 'Gambar', 'Sijil', 'Nota'];
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
   const $ = (s, el = document) => el.querySelector(s);
   const cfg = window.UPSI_CONFIG || {};
@@ -24,13 +15,14 @@
   let sb = null;
   let sudahMula = false;
   let pengguna = null;
-  let semua = [];
-  let editId = null;
-  let tabAktif = '';
-  try { tabAktif = localStorage.getItem('upsi-tab') || ''; } catch { /* tiada storage */ }
-  let failSedia = [];   // fail yang sudah ada pada tugasan yang sedang diedit
-  let failBuang = [];   // fail sedia yang ditanda untuk dipadam
-  let failBaru = [];    // File objek yang belum dimuat naik
+  let folders = [];        // nama folder (sebenar dalam storage)
+  let semua = [];          // { folder, nama, path, saiz, jenis, tarikh }
+  let labelLama = {};      // folder UUID dari versi lama -> tajuk tugasan
+  let folderAktif = '';
+  let failUpload = [];
+  const thumb = new Map(); // path -> signed URL gambar kecil
+
+  try { folderAktif = localStorage.getItem('upsi-folder') || ''; } catch { /* tiada storage */ }
 
   // ---------- Utiliti ----------
   const el = (tag, attrs = {}, ...anak) => {
@@ -49,7 +41,7 @@
   };
 
   const saiz = (b) => {
-    if (!b && b !== 0) return '';
+    if (b == null) return '';
     const u = ['B', 'KB', 'MB', 'GB'];
     let i = 0;
     while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
@@ -57,29 +49,36 @@
   };
 
   const tarikh = (d) => d
-    ? new Date(d + 'T00:00:00').toLocaleDateString('ms-MY', { day: 'numeric', month: 'short', year: 'numeric' })
+    ? new Date(d).toLocaleDateString('ms-MY', { day: 'numeric', month: 'short', year: 'numeric' })
     : '';
 
-  const bakiHari = (d) => {
-    if (!d) return null;
-    const hari = new Date(); hari.setHours(0, 0, 0, 0);
-    return Math.round((new Date(d + 'T00:00:00') - hari) / 86400000);
-  };
+  const sambungan = (nama) => (nama.includes('.') ? nama.split('.').pop().toLowerCase() : '');
 
-  const ikonFail = (nama = '', jenis = '') => {
-    const ext = nama.split('.').pop().toLowerCase();
-    if (jenis.startsWith('image/')) return '🖼️';
+  const isGambar = (f) => f.jenis.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic'].includes(sambungan(f.nama));
+
+  const ikonFail = (f) => {
+    const ext = sambungan(f.nama);
+    if (isGambar(f)) return '🖼️';
     if (ext === 'pdf') return '📕';
-    if (['doc', 'docx', 'odt', 'rtf', 'txt'].includes(ext)) return '📝';
+    if (['doc', 'docx', 'odt', 'rtf', 'txt', 'md'].includes(ext)) return '📝';
     if (['ppt', 'pptx', 'key', 'odp'].includes(ext)) return '📊';
     if (['xls', 'xlsx', 'csv', 'ods'].includes(ext)) return '📈';
-    if (['zip', 'rar', '7z'].includes(ext)) return '🗜️';
-    if (jenis.startsWith('video/')) return '🎬';
-    if (jenis.startsWith('audio/')) return '🎵';
+    if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return '🗜️';
+    if (f.jenis.startsWith('video/') || ['mp4', 'mov', 'mkv', 'avi'].includes(ext)) return '🎬';
+    if (f.jenis.startsWith('audio/') || ['mp3', 'wav', 'm4a'].includes(ext)) return '🎵';
     return '📄';
   };
 
-  const namaSelamat = (n) => n.normalize('NFKD').replace(/[^\w.\-]+/g, '_').replace(/_+/g, '_').slice(-120);
+  // Supabase Storage hanya terima huruf/nombor ASCII dan beberapa simbol dalam nama
+  const namaSelamat = (n) => n
+    .normalize('NFKD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^\w !\-.*'()&$@=;:+,]/g, '_')
+    .replace(/\s+/g, ' ').trim()
+    .slice(0, 150) || 'fail';
+
+  const namaFolderSelamat = (n) => namaSelamat(n).replace(/^\.+/, '').trim();
+
+  const labelFolder = (f) => labelLama[f] || (UUID.test(f) ? 'Fail lama' : f);
 
   let toastTimer;
   const toast = (msg, ralat = false) => {
@@ -96,10 +95,12 @@
     if (/Invalid login credentials/i.test(m)) return 'Emel atau kata laluan salah.';
     if (/Email not confirmed/i.test(m)) return 'Emel belum disahkan. Semak inbox kau.';
     if (/exceeded the maximum allowed size|Payload too large/i.test(m)) return 'Fail terlalu besar (had 50MB).';
-    if (/kategori/i.test(m) && /column|schema/i.test(m)) return 'Database belum dikemas kini. Jalankan supabase/02-kategori.sql dalam Supabase SQL Editor.';
+    if (/already exists|Duplicate/i.test(m)) return 'Nama tu dah wujud dalam folder ni.';
     if (/Failed to fetch|NetworkError/i.test(m)) return 'Tiada sambungan internet atau Supabase tidak dapat dicapai.';
     return m;
   };
+
+  const store = () => sb.storage.from(BUCKET);
 
   // ---------- Mula ----------
   function mula() {
@@ -124,332 +125,380 @@
   async function masuk() {
     $('#emel-pengguna').textContent = pengguna.email || '';
     tunjuk('skrin-utama');
+    $('#kosong').hidden = false;
+    $('#kosong').textContent = 'Memuatkan…';
     await muat();
   }
 
+  async function senaraiSemua(prefix) {
+    const hasil = [];
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await store().list(prefix, { limit: 1000, offset, sortBy: { column: 'name', order: 'asc' } });
+      if (error) throw error;
+      hasil.push(...data);
+      if (data.length < 1000) return hasil;
+    }
+  }
+
   async function muat() {
-    const { data, error } = await sb.from('tugasan').select('*');
-    if (error) { toast(mesejRalat(error), true); return; }
-    semua = (data || []).map((t) => ({ ...t, kategori: t.kategori || TUGASAN }));
-    kemasPilihan();
+    try {
+      const akar = await senaraiSemua(pengguna.id);
+      folders = akar.filter((e) => e.id === null).map((e) => e.name);
+      const isi = await Promise.all(folders.map((f) => senaraiSemua(`${pengguna.id}/${f}`)));
+      semua = isi.flatMap((list, i) => list
+        .filter((e) => e.id !== null && !e.name.startsWith('.'))
+        .map((e) => ({
+          folder: folders[i],
+          nama: e.name,
+          path: `${pengguna.id}/${folders[i]}/${e.name}`,
+          saiz: e.metadata?.size ?? 0,
+          jenis: e.metadata?.mimetype || '',
+          tarikh: e.created_at || e.updated_at,
+        })));
+    } catch (e) {
+      toast(mesejRalat(e), true);
+      return;
+    }
+
+    // Folder dari versi lama dinamakan dengan ID tugasan; guna tajuknya sebagai label
+    const lama = folders.filter((f) => UUID.test(f) && !labelLama[f]);
+    if (lama.length) {
+      const { data } = await sb.from('tugasan').select('id,tajuk').in('id', lama);
+      for (const r of data || []) labelLama[r.id] = r.tajuk;
+    }
+
+    if (folderAktif && !folders.includes(folderAktif)) folderAktif = '';
+    $('#senarai-folder').replaceChildren(
+      ...[...new Set([...folders.filter((f) => !UUID.test(f)), ...FOLDER_CADANGAN])].map((f) => el('option', {}, f)),
+    );
     papar();
   }
 
   // ---------- Paparan ----------
-  function senaraiKategori() {
-    const ada = new Set(semua.map((t) => t.kategori));
-    return [...KATEGORI_ASAS.filter((k) => ada.has(k)), ...[...ada].filter((k) => !KATEGORI_ASAS.includes(k)).sort()];
-  }
-
-  function kemasPilihan() {
-    const ada = senaraiKategori();
-    if (tabAktif && !ada.includes(tabAktif)) tabAktif = '';
-    $('#senarai-kategori').replaceChildren(...[...new Set([...KATEGORI_ASAS, ...ada])].map((k) => el('option', {}, k)));
-
-    const sems = [...new Set(semua.map((t) => t.semester).filter(Boolean))].sort().reverse();
-    const sel = $('#tapis-semester');
-    const nilai = sel.value;
-    sel.replaceChildren(el('option', { value: '' }, 'Semua semester'), ...sems.map((s) => el('option', {}, s)));
-    sel.value = sems.includes(nilai) ? nilai : '';
-    $('#senarai-semester').replaceChildren(...sems.map((s) => el('option', {}, s)));
-  }
-
-  function ditapis() {
-    const q = $('#cari').value.trim().toLowerCase();
-    const sem = $('#tapis-semester').value;
-    const st = $('#tapis-status').value;
-    const susun = $('#susun').value;
-
-    const hasil = semua.filter((t) => {
-      if (tabAktif && t.kategori !== tabAktif) return false;
-      if (sem && t.semester !== sem) return false;
-      if (st && t.status !== st) return false;
-      if (!q) return true;
-      return [t.kategori, t.tajuk, t.kod_kursus, t.nama_kursus, t.pensyarah, t.jenis, t.nota, ...(t.tag || []), ...(t.fail || []).map((f) => f.nama)]
-        .filter(Boolean).join(' ').toLowerCase().includes(q);
-    });
-
-    hasil.sort((a, b) => {
-      if (susun === 'baru') return b.created_at.localeCompare(a.created_at);
-      if (susun === 'kursus') return (a.kod_kursus || '~').localeCompare(b.kod_kursus || '~') || a.tajuk.localeCompare(b.tajuk);
-      return (a.tarikh_hantar || '9999').localeCompare(b.tarikh_hantar || '9999');
-    });
-    return hasil;
+  function pilihFolder(f) {
+    folderAktif = f;
+    try { localStorage.setItem('upsi-folder', f); } catch { /* tiada storage */ }
+    papar();
   }
 
   function papar() {
-    const jumlahFail = semua.reduce((n, t) => n + (t.fail?.length || 0), 0);
-    const tugasan = semua.filter((t) => t.kategori === TUGASAN);
-    const belum = tugasan.filter((t) => t.status !== 'Dihantar').length;
-    const lewat = tugasan.filter((t) => t.status !== 'Dihantar' && bakiHari(t.tarikh_hantar) < 0).length;
-    $('#statistik').replaceChildren(
-      kadStat('Jumlah item', semua.length),
-      kadStat('Tugasan belum dihantar', belum),
-      kadStat('Lewat', lewat, lewat ? 'amaran' : ''),
-      kadStat('Fail disimpan', jumlahFail),
-    );
+    const jumlah = semua.reduce((n, f) => n + f.saiz, 0);
+    $('#ruang-guna').textContent = `${semua.length} fail · ${saiz(jumlah)}`;
+    $('#ruang-had').textContent = ` daripada ${saiz(HAD_RUANG)}`;
+    const peratus = Math.min(100, (jumlah / HAD_RUANG) * 100);
+    $('#ruang-isi').style.width = `${Math.max(peratus, jumlah ? 0.5 : 0)}%`;
+    $('#ruang-isi').classList.toggle('penuh', peratus > 85);
 
-    const kategori = senaraiKategori();
+    const bil = (f) => semua.filter((x) => x.folder === f).length;
     const tab = (nilai, label, n) => el('button', {
-      class: `tab ${tabAktif === nilai ? 'aktif' : ''}`,
-      onclick: () => {
-        tabAktif = nilai;
-        try { localStorage.setItem('upsi-tab', nilai); } catch { /* tiada storage */ }
-        papar();
-      },
-    }, label, el('span', { class: 'tab-bil' }, String(n)));
-    $('#tab-kategori').replaceChildren(
+      class: `tab ${folderAktif === nilai ? 'aktif' : ''}`,
+      onclick: () => pilihFolder(nilai),
+    }, label, n != null && el('span', { class: 'tab-bil' }, String(n)));
+    const tersusun = [...folders].sort((a, b) => labelFolder(a).localeCompare(labelFolder(b)));
+    $('#tab-folder').replaceChildren(
       tab('', '🗂️ Semua', semua.length),
-      ...kategori.map((k) => tab(k, `${ikonKat(k)} ${k}`, semua.filter((t) => t.kategori === k).length)),
+      ...tersusun.map((f) => tab(f, `📁 ${labelFolder(f)}`, bil(f))),
+      el('button', { class: 'tab tab-baru', onclick: folderBaru }, '+ Folder Baru'),
     );
-    $('#tab-kategori').hidden = kategori.length < 2 && !tabAktif;
-    // Tapisan status hanya bermakna untuk tugasan
-    const st = $('#tapis-status');
-    st.hidden = !!tabAktif && tabAktif !== TUGASAN;
-    if (st.hidden) st.value = '';
 
-    const senarai = ditapis();
-    $('#senarai').replaceChildren(...senarai.map(kadItem));
+    $('#tajuk-folder').hidden = !folderAktif;
+    if (folderAktif) $('#nama-folder').textContent = `📁 ${labelFolder(folderAktif)}`;
+
+    const q = $('#cari').value.trim().toLowerCase();
+    const susun = $('#susun').value;
+    const senarai = semua
+      .filter((f) => (!folderAktif || f.folder === folderAktif)
+        && (!q || `${f.nama} ${labelFolder(f.folder)}`.toLowerCase().includes(q)))
+      .sort((a, b) => {
+        if (susun === 'nama') return a.nama.localeCompare(b.nama, 'ms', { numeric: true });
+        if (susun === 'saiz') return b.saiz - a.saiz;
+        return (b.tarikh || '').localeCompare(a.tarikh || '');
+      });
+
+    $('#senarai').replaceChildren(...senarai.map(kadFail));
     const k = $('#kosong');
     k.hidden = senarai.length > 0;
-    k.innerHTML = semua.length
-      ? 'Tiada item sepadan dengan carian/tapisan.'
-      : 'Belum ada apa-apa lagi. Tekan <b>+ Tambah Baru</b> untuk mula.';
+    if (!senarai.length) {
+      k.replaceChildren(
+        el('div', { class: 'kosong-ikon' }, q ? '🔍' : '📂'),
+        el('p', {}, q ? 'Tiada fail sepadan.' : folderAktif ? 'Folder ni kosong.' : 'Belum ada fail lagi.'),
+        !q && el('p', { class: 'pudar' }, 'Tekan ⬆ Upload Fail, atau seret fail ke sini.'),
+      );
+    }
+    muatThumb(senarai.filter(isGambar));
   }
 
-  const kadStat = (label, nilai, kelas = '') =>
-    el('div', { class: `stat ${kelas}` }, el('div', { class: 'stat-nilai' }, String(nilai)), el('div', { class: 'stat-label' }, label));
-
-  function kadItem(t) {
-    const isTugasan = t.kategori === TUGASAN;
-    const baki = bakiHari(t.tarikh_hantar);
-    let tarikhTeks = null;
-    if (t.tarikh_hantar) {
-      let ket = '';
-      let kelas = '';
-      if (isTugasan && t.status !== 'Dihantar' && baki !== null) {
-        if (baki < 0) { ket = ` · lewat ${-baki} hari`; kelas = 'lewat'; }
-        else if (baki === 0) { ket = ' · hari ini!'; kelas = 'dekat'; }
-        else if (baki <= 3) { ket = ` · ${baki} hari lagi`; kelas = 'dekat'; }
-      }
-      tarikhTeks = el('span', { class: `tarikh ${kelas}` }, `📅 ${tarikh(t.tarikh_hantar)}${ket}`);
-    }
+  function kadFail(f) {
+    const gambar = isGambar(f);
+    const pratonton = el('button', { class: 'kad-pratonton', title: 'Buka', onclick: () => bukaFail(f) },
+      gambar && thumb.has(f.path)
+        ? el('img', { src: thumb.get(f.path), alt: '', loading: 'lazy' })
+        : el('span', { class: 'kad-ikon', 'data-path': gambar ? f.path : null }, ikonFail(f)));
 
     return el('article', { class: 'kad' },
-      el('div', { class: 'kad-atas' },
-        el('div', { class: 'lencana-baris' },
-          !tabAktif && el('span', { class: 'lencana kategori' }, `${ikonKat(t.kategori)} ${t.kategori}`),
-          t.kod_kursus && el('span', { class: 'lencana kursus' }, t.kod_kursus),
-          isTugasan && t.status && el('span', { class: `lencana ${STATUS_KELAS[t.status] || ''}` }, t.status),
-          t.jenis && el('span', { class: 'lencana' }, t.jenis),
+      pratonton,
+      el('div', { class: 'kad-badan' },
+        el('button', { class: 'kad-nama', title: f.nama, onclick: () => bukaFail(f) }, f.nama),
+        el('div', { class: 'kad-meta pudar' },
+          !folderAktif && el('span', {}, `📁 ${labelFolder(f.folder)}`),
+          el('span', {}, saiz(f.saiz)),
+          el('span', {}, tarikh(f.tarikh)),
         ),
         el('div', { class: 'kad-aksi' },
-          el('button', { class: 'btn ikon', title: 'Edit', 'aria-label': 'Edit', onclick: () => bukaBorang(t) }, '✏️'),
-          el('button', { class: 'btn ikon', title: 'Padam', 'aria-label': 'Padam', onclick: () => padam(t) }, '🗑️'),
+          el('button', { class: 'btn ikon', title: 'Muat turun', 'aria-label': 'Muat turun', onclick: () => muatTurun(f) }, '⬇️'),
+          el('button', { class: 'btn ikon', title: 'Tukar nama', 'aria-label': 'Tukar nama', onclick: () => tukarNamaFail(f) }, '✏️'),
+          el('button', { class: 'btn ikon', title: 'Pindah folder', 'aria-label': 'Pindah folder', onclick: () => pindahFail(f) }, '📁'),
+          el('button', { class: 'btn ikon', title: 'Padam', 'aria-label': 'Padam', onclick: () => padamFail(f) }, '🗑️'),
         ),
       ),
-      el('h3', {}, t.tajuk),
-      el('div', { class: 'meta' },
-        t.nama_kursus && el('span', {}, t.nama_kursus),
-        t.semester && el('span', {}, t.semester),
-        t.pensyarah && el('span', {}, `👤 ${t.pensyarah}`),
-        tarikhTeks,
-        t.markah && el('span', { class: 'markah' }, `🏆 ${t.markah}`),
-      ),
-      t.nota && el('p', { class: 'nota' }, t.nota),
-      t.tag?.length ? el('div', { class: 'tag-baris' }, t.tag.map((g) => el('button', {
-        class: 'tag', onclick: () => { $('#cari').value = g; papar(); },
-      }, `#${g}`))) : null,
-      t.fail?.length ? el('ul', { class: 'fail-senarai' }, t.fail.map((f) => el('li', {},
-        el('button', { class: 'fail-nama', title: 'Buka', onclick: () => bukaFail(f) }, `${ikonFail(f.nama, f.jenis)} ${f.nama}`),
-        el('span', { class: 'pudar kecil' }, saiz(f.saiz)),
-        el('button', { class: 'btn ikon kecil', title: 'Muat turun', 'aria-label': 'Muat turun', onclick: () => muatTurun(f) }, '⬇️'),
-      ))) : null,
     );
   }
 
-  // ---------- Fail ----------
+  async function muatThumb(list) {
+    const perlu = list.filter((f) => !thumb.has(f.path)).map((f) => f.path);
+    if (!perlu.length) return;
+    const { data } = await store().createSignedUrls(perlu, 3600);
+    for (const d of data || []) {
+      if (!d.signedUrl) continue;
+      thumb.set(d.path, d.signedUrl);
+      document.querySelectorAll('.kad-ikon[data-path]').forEach((s) => {
+        if (s.dataset.path === d.path) s.replaceWith(el('img', { src: d.signedUrl, alt: '', loading: 'lazy' }));
+      });
+    }
+  }
+
+  // ---------- Tindakan fail ----------
   async function bukaFail(f) {
     const w = window.open('', '_blank'); // buka dulu supaya tak disekat popup blocker
-    const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(f.path, 3600);
+    const { data, error } = await store().createSignedUrl(f.path, 3600);
     if (error) { w?.close(); toast(mesejRalat(error), true); return; }
     if (w) w.location.href = data.signedUrl; else location.href = data.signedUrl;
   }
 
   async function muatTurun(f) {
-    const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(f.path, 120, { download: f.nama });
+    const { data, error } = await store().createSignedUrl(f.path, 120, { download: f.nama });
     if (error) { toast(mesejRalat(error), true); return; }
     const a = el('a', { href: data.signedUrl, download: f.nama });
     document.body.append(a); a.click(); a.remove();
   }
 
-  function paparFailBorang() {
-    const items = [
-      ...failSedia.map((f) => {
-        const buang = failBuang.includes(f);
-        return el('li', { class: buang ? 'dibuang' : '' },
-          el('span', { class: 'fail-nama' }, `${ikonFail(f.nama, f.jenis)} ${f.nama}`),
-          el('span', { class: 'pudar kecil' }, buang ? 'akan dipadam' : saiz(f.saiz)),
-          el('button', {
-            type: 'button', class: 'btn ikon kecil', title: buang ? 'Batal padam' : 'Padam',
-            onclick: () => { failBuang = buang ? failBuang.filter((x) => x !== f) : [...failBuang, f]; paparFailBorang(); },
-          }, buang ? '↩️' : '✕'),
-        );
-      }),
-      ...failBaru.map((f, i) => el('li', { class: 'baru' },
-        el('span', { class: 'fail-nama' }, `${ikonFail(f.name, f.type)} ${f.name}`),
-        el('span', { class: 'pudar kecil' }, `baru · ${saiz(f.size)}`),
-        el('button', {
-          type: 'button', class: 'btn ikon kecil', title: 'Buang',
-          onclick: () => { failBaru.splice(i, 1); paparFailBorang(); },
-        }, '✕'),
-      )),
-    ];
-    $('#fail-sedia').replaceChildren(...items);
-  }
-
-  function tambahFail(list) {
-    const HAD = 50 * 1024 * 1024;
-    for (const f of list) {
-      if (f.size > HAD) { toast(`"${f.name}" melebihi 50MB, tidak ditambah.`, true); continue; }
-      failBaru.push(f);
+  // Cari nama yang belum digunakan dalam folder: "laporan.pdf" -> "laporan (1).pdf"
+  function namaUnik(folder, nama, kecuali = null) {
+    const ada = new Set(semua.filter((f) => f.folder === folder && f.path !== kecuali).map((f) => f.nama.toLowerCase()));
+    if (!ada.has(nama.toLowerCase())) return nama;
+    const titik = nama.lastIndexOf('.');
+    const asas = titik > 0 ? nama.slice(0, titik) : nama;
+    const ext = titik > 0 ? nama.slice(titik) : '';
+    for (let i = 1; ; i++) {
+      const cuba = `${asas} (${i})${ext}`;
+      if (!ada.has(cuba.toLowerCase())) return cuba;
     }
-    paparFailBorang();
   }
 
-  // ---------- Borang ----------
-  function bukaBorang(t = null) {
-    const b = $('#borang');
-    b.reset();
-    editId = t?.id || null;
-    failSedia = t ? [...(t.fail || [])] : [];
-    failBuang = [];
-    failBaru = [];
-    $('#tajuk-borang').textContent = t ? 'Edit' : 'Tambah Baru';
-    $('#ralat-borang').hidden = true;
-
-    if (t) {
-      for (const k of ['kategori', 'tajuk', 'kod_kursus', 'nama_kursus', 'semester', 'pensyarah', 'jenis', 'tarikh_hantar', 'status', 'markah', 'nota']) {
-        b.elements[k].value = t[k] ?? '';
-      }
-      b.elements.tag.value = (t.tag || []).join(', ');
-      b.elements.status.value = t.status || 'Belum Mula';
-    } else {
-      b.elements.kategori.value = tabAktif || TUGASAN;
-      // Isi semester terakhir digunakan untuk jimat masa
-      const terkini = [...semua].sort((x, y) => y.created_at.localeCompare(x.created_at))[0];
-      if (terkini?.semester) b.elements.semester.value = terkini.semester;
-    }
-    kemasMedanKategori();
-    paparFailBorang();
-    $('#dialog-borang').showModal();
-    b.elements.tajuk.focus();
+  async function alih(f, folderBaru, namaBaru) {
+    const ke = `${pengguna.id}/${folderBaru}/${namaBaru}`;
+    if (ke === f.path) return;
+    const { error } = await store().move(f.path, ke);
+    if (error) throw error;
+    if (thumb.has(f.path)) thumb.delete(f.path);
   }
 
-  // Padankan huruf besar/kecil dengan kategori sedia ada, cth "nota kuliah" -> "Nota Kuliah"
-  function kategoriBorang() {
-    const k = $('#borang').elements.kategori.value.trim().replace(/\s+/g, ' ');
-    const sedia = [...KATEGORI_ASAS, ...senaraiKategori()].find((x) => x.toLowerCase() === k.toLowerCase());
-    return sedia || k;
+  function tukarNamaFail(f) {
+    mintaTeks({
+      tajuk: 'Tukar nama fail', label: 'Nama baru', nilai: f.nama,
+      pilih: f.nama.lastIndexOf('.') > 0 ? [0, f.nama.lastIndexOf('.')] : null,
+      ok: async (v) => {
+        const nama = namaSelamat(v);
+        if (nama !== f.nama && namaUnik(f.folder, nama, f.path) !== nama) throw new Error('Nama tu dah wujud dalam folder ni.');
+        await alih(f, f.folder, nama);
+        toast('Nama ditukar');
+      },
+    });
   }
 
-  function kemasMedanKategori() {
-    const isTugasan = kategoriBorang() === TUGASAN;
-    document.querySelectorAll('#borang .hanya-tugasan').forEach((n) => { n.hidden = !isTugasan; });
+  function pindahFail(f) {
+    mintaTeks({
+      tajuk: 'Pindah ke folder', label: 'Folder', nilai: f.folder === folderAktif ? '' : f.folder, senarai: true,
+      ok: async (v) => {
+        const folder = namaFolderSelamat(v);
+        if (!folder) throw new Error('Nama folder tidak sah.');
+        if (folder === f.folder) return;
+        await alih(f, folder, namaUnik(folder, f.nama));
+        toast(`Dipindah ke ${folder}`);
+      },
+    });
   }
 
-  function dataBorang() {
-    const e = $('#borang').elements;
-    const v = (k) => e[k].value.trim() || null;
-    const kategori = kategoriBorang();
-    const isTugasan = kategori === TUGASAN;
-    return {
-      kategori,
-      tajuk: e.tajuk.value.trim(),
-      kod_kursus: v('kod_kursus')?.toUpperCase() || null,
-      nama_kursus: v('nama_kursus'),
-      semester: v('semester'),
-      pensyarah: v('pensyarah'),
-      jenis: isTugasan ? v('jenis') : null,
-      tarikh_hantar: isTugasan ? v('tarikh_hantar') : null,
-      status: isTugasan ? e.status.value : null,
-      markah: isTugasan ? v('markah') : null,
-      nota: v('nota'),
-      tag: [...new Set(e.tag.value.split(',').map((s) => s.trim().replace(/^#/, '')).filter(Boolean))],
-    };
+  async function padamFail(f) {
+    if (!confirm(`Padam "${f.nama}"? Tindakan ini tidak boleh dibatalkan.`)) return;
+    const { error } = await store().remove([f.path]);
+    if (error) { toast(mesejRalat(error), true); return; }
+    toast('Fail dipadam');
+    await muat();
   }
 
-  async function simpan(ev) {
-    ev.preventDefault();
-    const btn = $('#btn-simpan');
-    const ralat = $('#ralat-borang');
-    ralat.hidden = true;
-    btn.disabled = true;
+  // ---------- Folder ----------
+  function folderBaru() {
+    mintaTeks({
+      tajuk: 'Folder baru', label: 'Nama folder', nilai: '',
+      ok: async (v) => {
+        const nama = namaFolderSelamat(v);
+        if (!nama) throw new Error('Nama folder tidak sah.');
+        if (folders.some((f) => f.toLowerCase() === nama.toLowerCase())) throw new Error('Folder tu dah wujud.');
+        const { error } = await store().upload(`${pengguna.id}/${nama}/${PLACEHOLDER}`, new Blob([''], { type: 'text/plain' }));
+        if (error) throw error;
+        folderAktif = nama;
+        try { localStorage.setItem('upsi-folder', nama); } catch { /* tiada storage */ }
+      },
+    });
+  }
 
+  async function isiFolder(folder) {
+    return (await senaraiSemua(`${pengguna.id}/${folder}`))
+      .filter((e) => e.id !== null)
+      .map((e) => `${pengguna.id}/${folder}/${e.name}`);
+  }
+
+  function tukarNamaFolder() {
+    const lama = folderAktif;
+    mintaTeks({
+      tajuk: 'Tukar nama folder', label: 'Nama baru', nilai: labelFolder(lama),
+      ok: async (v) => {
+        const nama = namaFolderSelamat(v);
+        if (!nama) throw new Error('Nama folder tidak sah.');
+        if (nama === lama) return;
+        if (folders.some((f) => f !== lama && f.toLowerCase() === nama.toLowerCase())) throw new Error('Folder tu dah wujud.');
+        for (const p of await isiFolder(lama)) {
+          const { error } = await store().move(p, `${pengguna.id}/${nama}/${p.split('/').pop()}`);
+          if (error) throw error;
+          thumb.delete(p);
+        }
+        folderAktif = nama;
+        try { localStorage.setItem('upsi-folder', nama); } catch { /* tiada storage */ }
+        toast('Nama folder ditukar');
+      },
+    });
+  }
+
+  async function padamFolder() {
+    const f = folderAktif;
+    const n = semua.filter((x) => x.folder === f).length;
+    if (!confirm(`Padam folder "${labelFolder(f)}"${n ? ` dan ${n} fail di dalamnya` : ''}? Tindakan ini tidak boleh dibatalkan.`)) return;
     try {
-      const data = dataBorang();
-      let id = editId;
-
-      if (!id) {
-        btn.textContent = 'Menyimpan…';
-        const { data: row, error } = await sb.from('tugasan').insert(data).select('id').single();
+      const paths = await isiFolder(f);
+      if (paths.length) {
+        const { error } = await store().remove(paths);
         if (error) throw error;
-        id = row.id;
-        editId = id; // jika upload gagal, cubaan seterusnya kemas kini rekod yang sama
       }
+    } catch (e) { toast(mesejRalat(e), true); return; }
+    folderAktif = '';
+    toast('Folder dipadam');
+    await muat();
+  }
 
-      let fail = failSedia.filter((f) => !failBuang.includes(f));
+  // ---------- Dialog teks ----------
+  let tindakanTeks = null;
+  function mintaTeks({ tajuk, label, nilai, ok, senarai = false, pilih = null }) {
+    const b = $('#borang-teks');
+    $('#teks-tajuk').textContent = tajuk;
+    $('#teks-label').textContent = label;
+    $('#ralat-teks').hidden = true;
+    b.elements.nilai.value = nilai;
+    if (senarai) b.elements.nilai.setAttribute('list', 'senarai-folder');
+    else b.elements.nilai.removeAttribute('list');
+    tindakanTeks = ok;
+    $('#dialog-teks').showModal();
+    b.elements.nilai.focus();
+    if (pilih) b.elements.nilai.setSelectionRange(...pilih);
+    else b.elements.nilai.select();
+  }
 
-      if (failBuang.length) {
-        btn.textContent = 'Memadam fail…';
-        const { error } = await sb.storage.from(BUCKET).remove(failBuang.map((f) => f.path));
-        if (error) throw error;
-        failSedia = [...fail];
-        failBuang = [];
-      }
-
-      const jumlah = failBaru.length;
-      while (failBaru.length) {
-        const f = failBaru[0];
-        btn.textContent = `Memuat naik ${jumlah - failBaru.length + 1}/${jumlah}…`;
-        const path = `${pengguna.id}/${id}/${Date.now()}-${namaSelamat(f.name)}`;
-        const { error } = await sb.storage.from(BUCKET).upload(path, f, { contentType: f.type || 'application/octet-stream' });
-        if (error) throw error;
-        const rekod = { nama: f.name, path, saiz: f.size, jenis: f.type || '' };
-        fail.push(rekod);
-        failSedia.push(rekod);
-        failBaru.shift();
-        paparFailBorang();
-      }
-
-      btn.textContent = 'Menyimpan…';
-      const { error } = await sb.from('tugasan').update({ ...data, fail }).eq('id', id);
-      if (error) throw error;
-
-      $('#dialog-borang').close();
-      toast('Disimpan ✔');
+  async function hantarTeks(ev) {
+    ev.preventDefault();
+    const btn = $('#btn-teks-ok');
+    const r = $('#ralat-teks');
+    const v = $('#borang-teks').elements.nilai.value.trim();
+    if (!v) return;
+    btn.disabled = true;
+    r.hidden = true;
+    try {
+      await tindakanTeks(v);
+      $('#dialog-teks').close();
       await muat();
     } catch (e) {
-      ralat.textContent = mesejRalat(e);
-      ralat.hidden = false;
-      await muat();
+      r.textContent = mesejRalat(e);
+      r.hidden = false;
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Simpan';
     }
   }
 
-  async function padam(t) {
-    const n = t.fail?.length || 0;
-    if (!confirm(`Padam "${t.tajuk}"${n ? ` beserta ${n} fail` : ''}? Tindakan ini tidak boleh dibatalkan.`)) return;
-    if (n) {
-      const { error } = await sb.storage.from(BUCKET).remove(t.fail.map((f) => f.path));
-      if (error) { toast(mesejRalat(error), true); return; }
+  // ---------- Upload ----------
+  function bukaUpload(fileList) {
+    failUpload = [];
+    tambahFailUpload(fileList);
+    if (!failUpload.length) return;
+    const b = $('#borang-upload');
+    b.elements.folder.value = folderAktif ? folderAktif : (folders.find((f) => !UUID.test(f)) || 'Kerja');
+    $('#ralat-upload').hidden = true;
+    if (!$('#dialog-upload').open) $('#dialog-upload').showModal();
+  }
+
+  function tambahFailUpload(fileList) {
+    for (const f of fileList) {
+      if (f.size > HAD_FAIL) { toast(`"${f.name}" melebihi 50MB, tidak ditambah.`, true); continue; }
+      failUpload.push(f);
     }
-    const { error } = await sb.from('tugasan').delete().eq('id', t.id);
-    if (error) { toast(mesejRalat(error), true); return; }
-    toast('Dipadam');
-    await muat();
+    paparUpload();
+  }
+
+  function paparUpload() {
+    $('#senarai-upload').replaceChildren(...failUpload.map((f, i) => el('li', {},
+      el('span', { class: 'fail-nama' }, `${ikonFail({ nama: f.name, jenis: f.type || '' })} ${f.name}`),
+      el('span', { class: 'pudar kecil' }, saiz(f.size)),
+      el('button', {
+        type: 'button', class: 'btn ikon kecil', title: 'Buang', 'aria-label': 'Buang',
+        onclick: () => { failUpload.splice(i, 1); paparUpload(); if (!failUpload.length) $('#dialog-upload').close(); },
+      }, '✕'),
+    )));
+    $('#btn-mula-upload').textContent = `Upload ${failUpload.length} fail`;
+  }
+
+  async function mulaUpload(ev) {
+    ev.preventDefault();
+    const btn = $('#btn-mula-upload');
+    const r = $('#ralat-upload');
+    const folder = namaFolderSelamat($('#borang-upload').elements.folder.value);
+    if (!folder) { r.textContent = 'Nama folder tidak sah.'; r.hidden = false; return; }
+    r.hidden = true;
+    btn.disabled = true;
+    const jumlah = failUpload.length;
+    let berjaya = 0;
+    try {
+      while (failUpload.length) {
+        const f = failUpload[0];
+        btn.textContent = `Upload ${berjaya + 1}/${jumlah}…`;
+        const nama = namaUnik(folder, namaSelamat(f.name));
+        const path = `${pengguna.id}/${folder}/${nama}`;
+        const { error } = await store().upload(path, f, { contentType: f.type || 'application/octet-stream' });
+        if (error) throw error;
+        // Simpan dalam senarai tempatan supaya fail seterusnya yang sama nama dapat nombor
+        semua.push({ folder, nama, path, saiz: f.size, jenis: f.type || '', tarikh: new Date().toISOString() });
+        failUpload.shift();
+        berjaya++;
+        paparUpload();
+      }
+      $('#dialog-upload').close();
+      if (folderAktif) folderAktif = folder;
+      toast(`${berjaya} fail diupload ke ${folder} ✔`);
+    } catch (e) {
+      r.textContent = `${berjaya ? `${berjaya} fail berjaya. ` : ''}Gagal: ${mesejRalat(e)}`;
+      r.hidden = false;
+    } finally {
+      btn.disabled = false;
+      paparUpload();
+      await muat();
+    }
   }
 
   // ---------- Acara ----------
@@ -475,21 +524,41 @@
     $('#btn-keluar').addEventListener('click', async () => {
       await sb.auth.signOut();
       semua = [];
+      folders = [];
+      thumb.clear();
     });
 
-    $('#btn-tambah').addEventListener('click', () => bukaBorang());
-    $('#borang').elements.kategori.addEventListener('input', kemasMedanKategori);
-    $('#borang').addEventListener('submit', simpan);
-    document.querySelectorAll('[data-tutup]').forEach((b) => b.addEventListener('click', () => $('#dialog-borang').close()));
+    $('#btn-upload').addEventListener('click', () => $('#input-fail').click());
+    $('#input-fail').addEventListener('change', (ev) => { bukaUpload(ev.target.files); ev.target.value = ''; });
+    $('#input-fail-tambah').addEventListener('change', (ev) => { tambahFailUpload(ev.target.files); ev.target.value = ''; });
+    $('#borang-upload').addEventListener('submit', mulaUpload);
+    $('#borang-teks').addEventListener('submit', hantarTeks);
+    $('#btn-nama-folder').addEventListener('click', tukarNamaFolder);
+    $('#btn-padam-folder').addEventListener('click', padamFolder);
+    document.querySelectorAll('[data-tutup]').forEach((b) => b.addEventListener('click', () => b.closest('dialog').close()));
+    ['#cari', '#susun'].forEach((s) => $(s).addEventListener('input', papar));
 
-    ['#cari', '#tapis-semester', '#tapis-status', '#susun'].forEach((s) => $(s).addEventListener('input', papar));
-
-    $('#input-fail').addEventListener('change', (ev) => { tambahFail(ev.target.files); ev.target.value = ''; });
-
-    const zon = $('#zon-lepas');
-    ['dragenter', 'dragover'].forEach((n) => zon.addEventListener(n, (ev) => { ev.preventDefault(); zon.classList.add('aktif'); }));
-    ['dragleave', 'drop'].forEach((n) => zon.addEventListener(n, () => zon.classList.remove('aktif')));
-    zon.addEventListener('drop', (ev) => { ev.preventDefault(); tambahFail(ev.dataTransfer.files); });
+    // Seret & lepas fail ke mana-mana bahagian skrin
+    const lapisan = $('#lapisan-seret');
+    let kiraSeret = 0;
+    const adaFail = (ev) => [...(ev.dataTransfer?.types || [])].includes('Files');
+    window.addEventListener('dragenter', (ev) => {
+      if (!adaFail(ev) || $('#skrin-utama').hidden) return;
+      ev.preventDefault();
+      kiraSeret++;
+      if (!$('#dialog-upload').open) lapisan.hidden = false;
+    });
+    window.addEventListener('dragover', (ev) => { if (adaFail(ev)) ev.preventDefault(); });
+    window.addEventListener('dragleave', () => { if (--kiraSeret <= 0) { kiraSeret = 0; lapisan.hidden = true; } });
+    window.addEventListener('drop', (ev) => {
+      if (!adaFail(ev)) return;
+      ev.preventDefault();
+      kiraSeret = 0;
+      lapisan.hidden = true;
+      if ($('#skrin-utama').hidden) return;
+      if ($('#dialog-upload').open) tambahFailUpload(ev.dataTransfer.files);
+      else bukaUpload(ev.dataTransfer.files);
+    });
   }
 
   mula();
