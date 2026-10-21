@@ -3,6 +3,7 @@
 
   const CEBISAN_UP = 8 * 1024 * 1024;    // saiz cebisan upload (gandaan 256KB)
   const CEBISAN_TURUN = 4 * 1024 * 1024; // saiz cebisan muat turun
+  const URL_PASANG = 'https://dynoz769.github.io/UPSI-DATA/?pasang'; // cara letak ikon di skrin utama
   const FOLDER_CADANGAN = ['Kerja', 'Peribadi', 'Dokumen', 'Gambar', 'Sijil', 'Nota'];
   const WARNA_PROFIL = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6', '#64748b'];
 
@@ -11,6 +12,9 @@
   const bolehGerak = !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
   const simpanTempatan = (k, v) => { try { localStorage.setItem(k, v); } catch { /* storan disekat */ } };
   const bacaTempatan = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+  // Sesi profil disimpan dalam sessionStorage: kekal bila refresh, hilang bila tab ditutup
+  const simpanSesi = (data) => { try { if (data) sessionStorage.setItem('upsi-sesi', JSON.stringify(data)); else sessionStorage.removeItem('upsi-sesi'); } catch { /* storan disekat */ } };
+  const bacaSesi = () => { try { return JSON.parse(sessionStorage.getItem('upsi-sesi') || 'null'); } catch { return null; } };
 
   // ---------- Ikon SVG (gaya garis, 24x24) ----------
   // 'c:x,y,r' = bulatan, 'r:x,y,w,h,rx' = segi empat, lain-lain = laluan
@@ -41,6 +45,11 @@
     amaran: ['c:12,12,9', 'M12 8v5', 'M12 16h.01'],
     info: ['c:12,12,9', 'M12 11v5', 'M12 8h.01'],
     awan: ['M7 18a5 5 0 1 1 .9-9.9A6 6 0 0 1 19 10a4 4 0 0 1-1 8', 'M12 12v8', 'm9 15 3-3 3 3'],
+    kiri: ['m15 6-6 6 6 6'],
+    pilih: ['r:3,3,18,18,4', 'm8 12 3 3 5-6'],
+    pulih: ['M3 12a9 9 0 1 0 3-6.7L3 8', 'M3 3v5h5'],
+    telefon: ['r:6,2,12,20,3', 'M11 18h2'],
+    zip: ['M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z', 'M14 3v5h5', 'M10 5h1', 'M10 8h1', 'M10 11h1', 'r:9,14,3,4,1'],
   };
   const NS = 'http://www.w3.org/2000/svg';
   function lukisIkon(svg, nama) {
@@ -200,6 +209,9 @@
   let folderAktif = '';    // id folder; '' = halaman utama
   let failUpload = [];
   let animasiSeterusnya = false;
+  let paparanSampah = false;  // sedang lihat Sampah
+  let sampah = [];            // item dalam Sampah
+  let senaraiSemasa = [];     // fail yang dipaparkan (untuk navigasi pemapar)
   let modPaparan = bacaTempatan('upsi-paparan') === 'senarai' ? 'senarai' : 'grid';
 
   // Panggil fungsi dalam Code.gs
@@ -377,10 +389,19 @@
       kad?.classList.remove('memuat');
     }
     kad?.classList.add('dipilih');
+    await bukaProfil(p, '');
+    kad?.classList.remove('dipilih');
+  }
+
+  // Tunjuk skrin fail untuk profil p (token sudah sah)
+  async function bukaProfil(p, folder) {
     profilAktif = p;
-    folderAktif = '';
+    folderAktif = folder || '';
+    paparanSampah = false;
     semua = [];
     folders = [];
+    kosongkanPilihan();
+    simpanSesi({ token, id: p.id, folder: folderAktif });
     $('#cari').value = '';
     const kecil = avatar(p, 'avatar-kecil');
     kecil.id = 'avatar-kecil';
@@ -389,14 +410,25 @@
     tunjukRangka();
     pasangLatar(p);
     await tukarSkrin('skrin-utama');
-    kad?.classList.remove('dipilih');
     animasiSeterusnya = true;
     await muat();
+  }
+
+  // Selepas refresh: guna semula sesi dalam tab ini kalau token masih sah
+  async function pulihSesi(s, sah) {
+    const p = s && profilList.find((x) => x.id === s.id);
+    if (!p || !(await sah)) { simpanSesi(null); return false; }
+    token = s.token;
+    await bukaProfil(p, s.folder);
+    return true;
   }
 
   function keluarProfil() {
     token = '';
     profilAktif = null;
+    simpanSesi(null);
+    kosongkanPilihan();
+    paparanSampah = false;
     tutupMenu(true);
     document.querySelectorAll('dialog[open]').forEach((d) => { delete d.dataset.sibuk; d.close(); });
     pasangLatar(null);
@@ -588,22 +620,53 @@
   function menuProfil(pencetus) {
     bukaMenu(pencetus, [
       { ikon: 'gambar', label: 'Latar belakang', tindakan: bukaDialogLatar },
+      { ikon: 'telefon', label: 'Pasang di skrin utama', tindakan: () => window.open(URL_PASANG, '_blank', 'noopener') },
       '-',
       { ikon: 'keluar', label: 'Tukar profil', tindakan: keluarProfil },
     ], el('span', {}, el('strong', {}, profilAktif?.nama || ''), saya.emel || labelOleh(saya.id)));
   }
 
   // ---------- Muat fail ----------
+  let teksRuang = '';
+  let kelihatan = []; // [id, jenis, item] untuk kad yang sedang dipaparkan (untuk "Pilih semua")
+
+  const serbukUtama = (bolehKlik) => el(bolehKlik ? 'button' : 'span', {
+    type: bolehKlik ? 'button' : null,
+    class: `serbuk-item ${bolehKlik ? '' : 'kini'}`,
+    onclick: bolehKlik ? () => { $('#cari').value = ''; bukaPaparan(''); } : null,
+  }, ikon('rumah'), el('span', {}, 'Utama'));
+  const serbukSampah = () => [ikon('kanan', 'serbuk-pemisah'), el('span', { class: 'serbuk-item kini' }, el('span', {}, 'Sampah'))];
+
+  // Butang kepala halaman berbeza untuk paparan biasa dan Sampah
+  function aturKepala() {
+    const s = paparanSampah;
+    $('#btn-sampah').setAttribute('aria-pressed', String(s));
+    $('#btn-baru').hidden = s;
+    $('#btn-kosongkan').hidden = !s;
+    $('#btn-kosongkan').disabled = !sampah.length;
+    $('#nota-sampah').hidden = !s;
+    $('#cari').placeholder = s ? 'Cari dalam Sampah' : 'Cari fail atau folder';
+  }
+
   function tunjukRangka() {
+    aturKepala();
     $('#bahagian-folder').hidden = true;
     $('#tajuk-fail').hidden = true;
     $('#kosong').hidden = true;
     $('#ruang').textContent = '';
-    isi($('#serbuk'), el('span', { class: 'serbuk-item kini' }, ikon('rumah'), el('span', {}, 'Utama')));
+    isi($('#serbuk'), serbukUtama(paparanSampah), paparanSampah && serbukSampah());
     const s = $('#senarai');
     s.classList.add('masuk');
     isi(s, ...Array.from({ length: modPaparan === 'senarai' ? 6 : 8 }, (_, i) => el('div', { class: 'kad rangka', style: `--i:${i}` },
       el('div', { class: 'rangka-gambar' }), el('div', {}, el('div', { class: 'rangka-baris' }), el('div', { class: 'rangka-baris pendek' })))));
+  }
+
+  function tunjukRalat(e, cubaLagi) {
+    $('#senarai').replaceChildren();
+    $('#bahagian-folder').hidden = true;
+    $('#kosong').hidden = false;
+    isi($('#kosong'), el('div', { class: 'kosong-ikon' }, ikon('amaran')), el('h3', {}, 'Tak dapat memuatkan'), el('p', {}, mesejRalat(e)),
+      el('button', { type: 'button', class: 'btn btn-garis', onclick: () => { tunjukRangka(); cubaLagi(); } }, 'Cuba lagi'));
   }
 
   async function muat() {
@@ -611,20 +674,31 @@
     try {
       d = await panggil('senarai');
     } catch (e) {
-      if (!token) return;
-      $('#senarai').replaceChildren();
-      $('#kosong').hidden = false;
-      isi($('#kosong'), el('div', { class: 'kosong-ikon' }, ikon('amaran')), el('h3', {}, 'Tak dapat memuatkan fail'), el('p', {}, mesejRalat(e)),
-        el('button', { type: 'button', class: 'btn btn-garis', onclick: () => { tunjukRangka(); muat(); } }, 'Cuba lagi'));
+      if (!token || paparanSampah) return;
+      tunjukRalat(e, muat);
       return;
     }
     akarId = d.akarId;
     folders = d.folders;
     semua = d.fail;
     const jumlah = semua.reduce((n, f) => n + f.saiz, 0);
-    $('#ruang').textContent = `${semua.length} fail · ${saiz(jumlah)}${d.guna ? ` · Drive: ${saiz(d.guna)} digunakan${d.had > 0 && d.had < 1e15 ? ` daripada ${saiz(d.had)}` : ''}` : ''}`;
+    teksRuang = `${semua.length} fail · ${saiz(jumlah)}${d.guna ? ` · Drive: ${saiz(d.guna)} digunakan${d.had > 0 && d.had < 1e15 ? ` daripada ${saiz(d.had)}` : ''}` : ''}`;
     if (folderAktif && folderAktif !== akarId && !folders.some((f) => f.id === folderAktif)) folderAktif = '';
     isi($('#senarai-folder'), ...[...new Set([...folders.map((f) => f.nama), ...FOLDER_CADANGAN])].map((f) => el('option', {}, f)));
+    segarkanPilihan();
+    papar();
+  }
+
+  async function muatSampah() {
+    try {
+      sampah = await panggil('senaraiSampah');
+    } catch (e) {
+      if (!token || !paparanSampah) return;
+      tunjukRalat(e, muatSampah);
+      return;
+    }
+    if (!paparanSampah) return;
+    segarkanPilihan();
     papar();
   }
 
@@ -641,10 +715,29 @@
   };
 
   function bukaPaparan(id) {
+    const dariSampah = paparanSampah;
     folderAktif = id;
+    paparanSampah = false;
+    kosongkanPilihan();
+    if (token && profilAktif) simpanSesi({ token, id: profilAktif.id, folder: id });
     animasiSeterusnya = true;
-    papar();
+    if (dariSampah) {
+      // Item mungkin baru dipulihkan, jadi muat semula senarai fail
+      tunjukRangka();
+      muat();
+    } else papar();
     window.scrollTo({ top: 0, behavior: bolehGerak ? 'smooth' : 'auto' });
+  }
+
+  function bukaSampah() {
+    paparanSampah = true;
+    sampah = [];
+    kosongkanPilihan();
+    $('#cari').value = '';
+    animasiSeterusnya = true;
+    tunjukRangka();
+    window.scrollTo(0, 0);
+    muatSampah();
   }
 
   function aturMod() {
@@ -657,17 +750,27 @@
     segmen.querySelectorAll('.segmen-btn').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.paparan === modPaparan)));
   }
 
+  // Kad masuk berperingkat (hanya bila tukar paparan, bukan setiap kali menaip carian)
+  function animasiKad() {
+    const anim = animasiSeterusnya;
+    animasiSeterusnya = false;
+    let indeks = 0;
+    for (const bekas of [$('#grid-folder'), $('#senarai')]) {
+      bekas.classList.toggle('masuk', anim);
+      for (const k of bekas.children) k.style.setProperty('--i', indeks++);
+    }
+  }
+
   function papar() {
+    aturKepala();
+    if (paparanSampah) { paparSampah(); return; }
     const q = $('#cari').value.trim().toLowerCase();
     const dalamFolder = folderAktif && folderAktif !== akarId;
+    $('#ruang').textContent = teksRuang;
 
     // Laluan (breadcrumb)
     isi($('#serbuk'),
-      el(dalamFolder || q ? 'button' : 'span', {
-        type: dalamFolder || q ? 'button' : null,
-        class: `serbuk-item ${dalamFolder || q ? '' : 'kini'}`,
-        onclick: dalamFolder || q ? () => { $('#cari').value = ''; bukaPaparan(''); } : null,
-      }, ikon('rumah'), el('span', {}, 'Utama')),
+      serbukUtama(dalamFolder || q),
       dalamFolder && !q && [
         ikon('kanan', 'serbuk-pemisah'),
         el('span', { class: 'serbuk-item kini' }, el('span', {}, namaFolder(folderAktif))),
@@ -685,17 +788,11 @@
       if (q) return (!dalamFolder || f.folderId === folderAktif) && `${f.nama} ${namaFolder(f.folderId)}`.toLowerCase().includes(q);
       return f.folderId === (dalamFolder ? folderAktif : akarId);
     }));
+    senaraiSemasa = senarai;
+    kelihatan = [...kadFolderList.map((f) => [f.id, 'folder', f]), ...senarai.map((f) => [f.id, 'fail', f])];
     $('#tajuk-fail').hidden = !(senarai.length && kadFolderList.length);
     $('#senarai').replaceChildren(...senarai.map(kadFail));
-
-    // Kad masuk berperingkat (hanya bila tukar paparan, bukan setiap kali menaip carian)
-    const anim = animasiSeterusnya;
-    animasiSeterusnya = false;
-    let indeks = 0;
-    for (const bekas of [$('#grid-folder'), $('#senarai')]) {
-      bekas.classList.toggle('masuk', anim);
-      for (const k of bekas.children) k.style.setProperty('--i', indeks++);
-    }
+    animasiKad();
 
     const k = $('#kosong');
     k.hidden = senarai.length > 0 || kadFolderList.length > 0;
@@ -707,6 +804,34 @@
         !q && el('button', { type: 'button', class: 'btn btn-utama', onclick: () => $('#input-fail').click() }, ikon('upload'), el('span', {}, 'Upload fail')),
       );
     }
+    kemasPilihan();
+  }
+
+  function paparSampah() {
+    const q = $('#cari').value.trim().toLowerCase();
+    isi($('#serbuk'), serbukUtama(true), serbukSampah());
+    const list = susunFail(sampah.filter((x) => !q || x.nama.toLowerCase().includes(q)));
+    const fol = list.filter((x) => x.folder);
+    const fail = list.filter((x) => !x.folder);
+    $('#bahagian-folder').hidden = !fol.length;
+    $('#grid-folder').replaceChildren(...fol.map(kadSampah));
+    $('#tajuk-fail').hidden = !(fail.length && fol.length);
+    $('#senarai').replaceChildren(...fail.map(kadSampah));
+    senaraiSemasa = [];
+    kelihatan = [...fol, ...fail].map((x) => [x.id, 'sampah', x]);
+    const jumlah = sampah.reduce((n, x) => n + x.saiz, 0);
+    $('#ruang').textContent = `${sampah.length} item${jumlah ? ` · ${saiz(jumlah)}` : ''}`;
+    animasiKad();
+    const k = $('#kosong');
+    k.hidden = list.length > 0;
+    if (!k.hidden) {
+      isi(k,
+        el('div', { class: 'kosong-ikon' }, ikon(q ? 'cari' : 'sampah')),
+        el('h3', {}, q ? 'Tiada hasil' : 'Sampah kosong'),
+        el('p', {}, q ? 'Cuba cari dengan perkataan lain.' : 'Fail dan folder yang dipadam akan muncul di sini.'),
+      );
+    }
+    kemasPilihan();
   }
 
   // ---------- Pratonton gambar ----------
@@ -726,11 +851,12 @@
     return thumbServer.get(f.id);
   }
 
-  function gambarPratonton(f) {
+  function gambarPratonton(f, bolehServer = true) {
     const ganti = () => lencanaFail(f);
     const img = el('img', { alt: '', loading: 'lazy', referrerpolicy: 'no-referrer', decoding: 'async' });
     img.addEventListener('load', () => img.classList.add('dimuat'));
     const dariServer = () => {
+      if (!bolehServer) { img.replaceWith(ganti()); return; }
       ambilThumbServer(f).then((url) => {
         if (url) img.src = url;
         else img.replaceWith(ganti());
@@ -740,17 +866,145 @@
     else if (f.thumb) {
       img.addEventListener('error', dariServer, { once: true });
       img.src = f.thumb;
-    } else if (f.jenis.startsWith('image/')) dariServer();
+    } else if (f.jenis.startsWith('image/') && bolehServer) dariServer();
     else return ganti();
     return img;
+  }
+
+  // ---------- Pilih banyak item ----------
+  const pilihan = new Map(); // id -> { jenis: 'fail' | 'folder' | 'sampah', item }
+  let modPilih = false;      // false | 'butang' (dibuka dengan butang Pilih) | 'auto' (tamat bila tiada pilihan)
+
+  function kosongkanPilihan() {
+    pilihan.clear();
+    modPilih = false;
+    kemasPilihan();
+  }
+
+  function togolPilih(id, jenis, item) {
+    if (pilihan.has(id)) pilihan.delete(id);
+    else pilihan.set(id, { jenis, item });
+    if (!modPilih && pilihan.size) modPilih = 'auto';
+    else if (modPilih === 'auto' && !pilihan.size) modPilih = false;
+    kemasPilihan();
+  }
+
+  function pilihSemua() {
+    const semuaDipilih = kelihatan.length > 0 && kelihatan.every(([id]) => pilihan.has(id));
+    for (const [id, jenis, item] of kelihatan) {
+      if (semuaDipilih) pilihan.delete(id);
+      else pilihan.set(id, { jenis, item });
+    }
+    if (!modPilih) modPilih = 'butang';
+    kemasPilihan();
+  }
+
+  // Selepas muat semula: buang item yang dah tiada, guna data terkini untuk yang masih ada
+  function segarkanPilihan() {
+    const terkini = new Map((paparanSampah ? sampah : [...folders, ...semua]).map((x) => [x.id, x]));
+    for (const [id, p] of [...pilihan]) {
+      if (terkini.has(id)) p.item = terkini.get(id);
+      else pilihan.delete(id);
+    }
+  }
+
+  function kemasPilihan() {
+    $('#isi').classList.toggle('mod-pilih', !!modPilih);
+    $('#btn-pilih').setAttribute('aria-pressed', String(!!modPilih));
+    document.querySelectorAll('#isi .kad[data-id]').forEach((k) => {
+      const d = pilihan.has(k.dataset.id);
+      k.classList.toggle('dipilih', d);
+      k.querySelector('.kad-pilih')?.setAttribute('aria-checked', String(d));
+    });
+    const bar = $('#bar-pilih');
+    document.body.classList.toggle('ada-bar-pilih', !!modPilih);
+    if (modPilih) {
+      $('#bil-pilih').textContent = pilihan.size ? `${pilihan.size} dipilih` : 'Pilih item';
+      const semuaDipilih = kelihatan.length > 0 && kelihatan.every(([id]) => pilihan.has(id));
+      $('#btn-pilih-semua').textContent = semuaDipilih ? 'Nyahpilih semua' : 'Pilih semua';
+      $('#btn-pilih-semua').hidden = !kelihatan.length;
+      isi($('#tindakan-pilih'), ...butangTindakanPilih());
+      bar.classList.remove('keluar');
+      bar.hidden = false;
+    } else if (!bar.hidden) {
+      if (!bolehGerak) { bar.hidden = true; return; }
+      bar.classList.add('keluar');
+      setTimeout(() => { if (!modPilih) bar.hidden = true; bar.classList.remove('keluar'); }, 180);
+    }
+  }
+
+  function butangTindakanPilih() {
+    const dipilih = [...pilihan.values()];
+    const tiada = !dipilih.length;
+    const butang = (nama, label, tindakan, { bahaya = false, lumpuh = tiada, tajuk = null } = {}) => el('button', {
+      type: 'button', class: `btn ${bahaya ? 'btn-bahaya' : 'btn-teks'}`, disabled: lumpuh, title: tajuk, onclick: tindakan,
+    }, ikon(nama), el('span', {}, label));
+    if (paparanSampah) {
+      const items = dipilih.map((x) => x.item);
+      return [
+        butang('pulih', 'Pulihkan', () => pulihkanItem(items)),
+        butang('sampah', 'Padam kekal', () => padamKekalItem(items), { bahaya: true }),
+      ];
+    }
+    const adaFolder = dipilih.some((x) => x.jenis === 'folder');
+    return [
+      butang('muatTurun', 'Muat turun', muatTurunPilihan),
+      butang('pindah', 'Pindah', pindahPilihan, { lumpuh: tiada || adaFolder, tajuk: adaFolder ? 'Hanya fail boleh dipindah' : null }),
+      butang('sampah', 'Padam', padamPilihan, { bahaya: true }),
+    ];
+  }
+
+  const kotakPilih = (id, jenis, item) => el('button', {
+    type: 'button', class: 'kad-pilih', role: 'checkbox', 'aria-checked': String(pilihan.has(id)), 'aria-label': `Pilih ${item.nama}`,
+    onclick: () => togolPilih(id, jenis, item),
+  }, ikon('betul'));
+
+  // Dalam mod pilih, klik di mana-mana pada kad memilihnya. Tekan lama (sentuhan) mula memilih.
+  function pasangKad(kad, togol) {
+    kad.addEventListener('click', (ev) => { if (modPilih && !ev.target.closest('button')) togol(); });
+    let pemasa = null;
+    let mula = null;
+    let sentuh = false;
+    const batal = () => { clearTimeout(pemasa); pemasa = null; kad.classList.remove('ditekan'); };
+    const tekanLama = () => {
+      batal();
+      kad.dataset.tekanLama = '1';
+      if (navigator.vibrate) navigator.vibrate(12);
+      togol();
+    };
+    kad.addEventListener('pointerdown', (ev) => {
+      delete kad.dataset.tekanLama; // sesetengah pelayar tak hantar klik selepas tekan lama
+      sentuh = ev.pointerType === 'touch';
+      if (!sentuh) return;
+      mula = { x: ev.clientX, y: ev.clientY };
+      kad.classList.add('ditekan');
+      pemasa = setTimeout(tekanLama, 480);
+    });
+    kad.addEventListener('pointermove', (ev) => { if (pemasa && Math.hypot(ev.clientX - mula.x, ev.clientY - mula.y) > 10) batal(); });
+    kad.addEventListener('pointerup', batal);
+    kad.addEventListener('pointercancel', batal);
+    kad.addEventListener('contextmenu', (ev) => {
+      if (!sentuh) return;
+      ev.preventDefault();
+      if (pemasa) tekanLama();
+    });
+    // Klik yang menyusul tekan lama tidak membuka fail
+    kad.addEventListener('click', (ev) => {
+      if (!kad.dataset.tekanLama) return;
+      delete kad.dataset.tekanLama;
+      ev.stopPropagation();
+      ev.preventDefault();
+    }, true);
   }
 
   function kadFolder(folder) {
     const isiFolder = semua.filter((f) => f.folderId === folder.id);
     const gambar = susunFail(isiFolder.filter(bolehPratonton)).slice(0, 4);
     const jumlah = isiFolder.reduce((n, f) => n + f.saiz, 0);
-    const buka = () => bukaPaparan(folder.id);
-    return el('article', { class: 'kad kad-folder' },
+    const togol = () => togolPilih(folder.id, 'folder', folder);
+    const buka = () => (modPilih ? togol() : bukaPaparan(folder.id));
+    const kad = el('article', { class: `kad kad-folder ${pilihan.has(folder.id) ? 'dipilih' : ''}`, 'data-id': folder.id },
+      kotakPilih(folder.id, 'folder', folder),
       el('button', { type: 'button', class: 'kad-pratonton', 'aria-label': `Buka folder ${folder.nama}`, onclick: buka },
         gambar.length
           ? el('div', { class: `mozek mozek-${gambar.length}` }, gambar.map((f) => el('div', { class: 'mozek-sel' }, gambarPratonton(f))))
@@ -767,14 +1021,19 @@
       ),
       el('button', { type: 'button', class: 'btn-ikon kad-menu', 'aria-label': `Pilihan untuk ${folder.nama}`, 'aria-haspopup': 'menu', onclick: (ev) => menuFolder(ev.currentTarget, folder.id, true) }, ikon('lagi')),
     );
+    pasangKad(kad, togol);
+    return kad;
   }
 
   function kadFail(f) {
     const lokasiLain = f.folderId !== (folderAktif && folderAktif !== akarId ? folderAktif : akarId);
-    return el('article', { class: 'kad kad-fail' },
-      el('button', { type: 'button', class: 'kad-pratonton', 'aria-label': `Buka ${f.nama}`, onclick: () => bukaFail(f) }, gambarPratonton(f)),
+    const togol = () => togolPilih(f.id, 'fail', f);
+    const buka = () => (modPilih ? togol() : bukaPemapar(f));
+    const kad = el('article', { class: `kad kad-fail ${pilihan.has(f.id) ? 'dipilih' : ''}`, 'data-id': f.id },
+      kotakPilih(f.id, 'fail', f),
+      el('button', { type: 'button', class: 'kad-pratonton', 'aria-label': `Buka ${f.nama}`, onclick: buka }, gambarPratonton(f)),
       el('div', { class: 'kad-badan' },
-        el('button', { type: 'button', class: 'kad-nama', title: f.nama, onclick: () => bukaFail(f) }, el('span', {}, f.nama)),
+        el('button', { type: 'button', class: 'kad-nama', title: f.nama, onclick: buka }, el('span', {}, f.nama)),
         lokasiLain && el('span', { class: 'nama-lokasi' }, namaFolder(f.folderId)),
         el('div', { class: 'kad-meta' },
           el('span', { class: 'meta-oleh', title: f.oleh ? `Diupload oleh ${labelOleh(f.oleh)}` : null }, labelOleh(f.oleh)),
@@ -784,12 +1043,36 @@
       ),
       el('button', { type: 'button', class: 'btn-ikon kad-menu', 'aria-label': `Pilihan untuk ${f.nama}`, 'aria-haspopup': 'menu', onclick: (ev) => menuFail(ev.currentTarget, f) }, ikon('lagi')),
     );
+    pasangKad(kad, togol);
+    return kad;
+  }
+
+  function kadSampah(x) {
+    const togol = () => togolPilih(x.id, 'sampah', x);
+    const tindakan = (ev) => (modPilih ? togol() : menuSampah(ev.currentTarget, x));
+    const kad = el('article', { class: `kad kad-sampah ${x.folder ? 'kad-folder' : 'kad-fail'} ${pilihan.has(x.id) ? 'dipilih' : ''}`, 'data-id': x.id },
+      kotakPilih(x.id, 'sampah', x),
+      el('button', { type: 'button', class: 'kad-pratonton', 'aria-label': `Pilihan untuk ${x.nama}`, 'aria-haspopup': 'menu', onclick: tindakan },
+        x.folder ? ikon('folder', 'folder-besar') : gambarPratonton(x, false)),
+      el('div', { class: 'kad-badan' },
+        el('button', { type: 'button', class: 'kad-nama', title: x.nama, onclick: tindakan }, x.folder && ikon('folder', 'ik-folder'), el('span', {}, x.nama)),
+        el('span', { class: 'nama-lokasi' }, `Dari ${x.lokasi || 'Utama'}`),
+        el('div', { class: 'kad-meta' },
+          el('span', { class: 'meta-tarikh' }, x.folder ? `${x.bil} fail` : tarikh(x.tarikh)),
+          el('span', { class: 'meta-saiz' }, x.saiz > 0 ? saiz(x.saiz) : ''),
+        ),
+      ),
+      el('button', { type: 'button', class: 'btn-ikon kad-menu', 'aria-label': `Pilihan untuk ${x.nama}`, 'aria-haspopup': 'menu', onclick: (ev) => menuSampah(ev.currentTarget, x) }, ikon('lagi')),
+    );
+    pasangKad(kad, togol);
+    return kad;
   }
 
   function menuFail(pencetus, f) {
     bukaMenu(pencetus, [
-      { ikon: 'buka', label: 'Buka', tindakan: () => bukaFail(f) },
+      { ikon: 'buka', label: 'Buka', tindakan: () => bukaPemapar(f) },
       { ikon: 'muatTurun', label: 'Muat turun', tindakan: () => muatTurun(f) },
+      { ikon: 'pilih', label: 'Pilih', tindakan: () => togolPilih(f.id, 'fail', f) },
       '-',
       { ikon: 'pensel', label: 'Tukar nama', tindakan: () => tukarNamaFail(f) },
       { ikon: 'pindah', label: 'Pindah ke folder', tindakan: () => pindahFail(f) },
@@ -799,12 +1082,24 @@
   }
 
   function menuFolder(pencetus, id, adaBuka) {
+    const folder = folders.find((f) => f.id === id);
     bukaMenu(pencetus, [
       adaBuka && { ikon: 'buka', label: 'Buka', tindakan: () => bukaPaparan(id) },
-      adaBuka && '-',
+      { ikon: 'zip', label: 'Muat turun (ZIP)', tindakan: () => muatTurunFolder(id) },
+      adaBuka && folder && { ikon: 'pilih', label: 'Pilih', tindakan: () => togolPilih(id, 'folder', folder) },
+      '-',
       { ikon: 'pensel', label: 'Tukar nama', tindakan: () => tukarNamaFolder(id) },
       { ikon: 'sampah', label: 'Padam folder', bahaya: true, tindakan: () => padamFolder(id) },
     ], innerWidth < 600 ? el('span', {}, el('strong', {}, namaFolder(id))) : null);
+  }
+
+  function menuSampah(pencetus, x) {
+    bukaMenu(pencetus, [
+      { ikon: 'pulih', label: 'Pulihkan', tindakan: () => pulihkanItem([x]) },
+      { ikon: 'pilih', label: 'Pilih', tindakan: () => togolPilih(x.id, 'sampah', x) },
+      '-',
+      { ikon: 'sampah', label: 'Padam kekal', bahaya: true, tindakan: () => padamKekalItem([x]) },
+    ], innerWidth < 600 ? el('span', {}, el('strong', {}, x.nama), x.folder ? `Folder · ${x.bil} fail` : `${saiz(x.saiz)} · Dari ${x.lokasi || 'Utama'}`) : null);
   }
 
   function menuBaru(pencetus) {
@@ -824,26 +1119,62 @@
     return out;
   };
 
-  async function ambilFail(f) {
-    if (isGoogleDoc(f)) {
-      toast('Menyediakan PDF…', 'muat', true);
-      const r = await panggil('eksportPdf', f.id);
-      return { blob: new Blob([base64KeBait(r.b64)], { type: 'application/pdf' }), nama: r.nama };
+  // Fail kecil yang baru dibuka disimpan sementara supaya buka semula / muat turun tak perlu ambil lagi
+  const HAD_CACHE = 40 * 1024 * 1024;
+  const cacheBlob = new Map(); // id -> { blob, nama }
+  const sedangAmbil = new Map(); // id -> Promise (elak ambil fail yang sama dua kali serentak)
+
+  // kemajuan(p): p = 0..1, atau null semasa Google Docs ditukar ke PDF
+  function ambilFail(f, kemajuan, simpan = true) {
+    const ada = cacheBlob.get(f.id);
+    if (ada) {
+      cacheBlob.delete(f.id);
+      cacheBlob.set(f.id, ada);
+      return Promise.resolve(ada);
     }
-    const bahagian = [];
-    for (let mula = 0; mula < f.saiz; mula += CEBISAN_TURUN) {
-      toast(`Memuatkan ${f.nama} · ${Math.round((mula / f.saiz) * 100)}%`, 'muat', true);
-      bahagian.push(base64KeBait(await panggil('bacaCebisan', f.id, mula, Math.min(CEBISAN_TURUN, f.saiz - mula))));
-    }
-    return { blob: new Blob(bahagian, { type: f.jenis || 'application/octet-stream' }), nama: f.nama };
+    if (sedangAmbil.has(f.id)) return sedangAmbil.get(f.id);
+    const lapor = kemajuan || ((p) => toast(p == null ? 'Menyediakan PDF…' : `Memuatkan ${f.nama} · ${Math.round(p * 100)}%`, 'muat', true));
+    const janji = (async () => {
+      let hasil;
+      if (isGoogleDoc(f)) {
+        lapor(null);
+        const r = await panggil('eksportPdf', f.id);
+        hasil = { blob: new Blob([base64KeBait(r.b64)], { type: 'application/pdf' }), nama: r.nama };
+      } else {
+        const bahagian = [];
+        for (let mula = 0; mula < f.saiz; mula += CEBISAN_TURUN) {
+          lapor(mula / f.saiz);
+          bahagian.push(base64KeBait(await panggil('bacaCebisan', f.id, mula, Math.min(CEBISAN_TURUN, f.saiz - mula))));
+        }
+        hasil = { blob: new Blob(bahagian, { type: f.jenis || 'application/octet-stream' }), nama: f.nama };
+      }
+      if (simpan && hasil.blob.size <= HAD_CACHE) {
+        cacheBlob.set(f.id, hasil);
+        while (cacheBlob.size > 6) cacheBlob.delete(cacheBlob.keys().next().value);
+      }
+      return hasil;
+    })().finally(() => sedangAmbil.delete(f.id));
+    sedangAmbil.set(f.id, janji);
+    return janji;
   }
 
-  async function bukaFail(f) {
+  function simpanBlob(blob, nama) {
+    const url = URL.createObjectURL(blob);
+    const a = el('a', { href: url, download: nama });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+
+  async function bukaTabBaru(f) {
     const w = window.open('', '_blank'); // buka dulu supaya tak disekat popup blocker
     if (w) w.document.write('<p style="font-family:system-ui,sans-serif;padding:24px;color:#475467">Memuatkan…</p>');
     try {
       const { blob } = await ambilFail(f);
-      const url = URL.createObjectURL(blob);
+      // HTML/SVG dibuka sebagai teks supaya skrip dalam fail tidak berjalan
+      const selamat = /html|svg|xml|javascript/i.test(blob.type) ? new Blob([blob], { type: 'text/plain' }) : blob;
+      const url = URL.createObjectURL(selamat);
       if (w) w.location.href = url; else window.open(url, '_blank');
       tutupToast();
     } catch (e) {
@@ -855,16 +1186,350 @@
   async function muatTurun(f) {
     try {
       const { blob, nama } = await ambilFail(f);
-      const url = URL.createObjectURL(blob);
-      const a = el('a', { href: url, download: nama });
-      document.body.append(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      simpanBlob(blob, nama);
       toast(`${nama} dimuat turun`, 'ok');
     } catch (e) {
       toast(mesejRalat(e), 'ralat');
     }
+  }
+
+  // ---------- Pemapar fail (gambar, PDF, video, audio, teks) ----------
+  const pemapar = $('#pemapar');
+  const HAD_PEMAPAR = 150 * 1024 * 1024; // fail lebih besar perlu dimuat turun dulu
+  const HAD_TEKS = 2 * 1024 * 1024;
+  const EXT_TEKS = ['txt', 'md', 'csv', 'tsv', 'json', 'xml', 'html', 'htm', 'css', 'js', 'ts', 'py', 'java', 'c', 'cpp', 'h', 'cs', 'php', 'sql', 'log', 'yml', 'yaml', 'ini', 'sh', 'gs', 'tex', 'srt'];
+  const GOOGLE_BOLEH_PDF = ['document', 'spreadsheet', 'presentation', 'drawing'];
+  let pemaparFail = null;
+  let pemaparUrl = '';
+  let giliranPemapar = 0;
+
+  function caraPapar(f) {
+    const j = f.jenis || '';
+    const ext = sambungan(f.nama);
+    if (isGoogleDoc(f)) return GOOGLE_BOLEH_PDF.some((t) => j.endsWith(`.${t}`)) ? 'pdf' : null;
+    if (j.startsWith('image/') && !/heic|heif|tiff|photoshop/.test(j)) return 'gambar';
+    if (j === 'application/pdf' || ext === 'pdf') return navigator.pdfViewerEnabled === false ? null : 'pdf';
+    if (j.startsWith('video/')) return 'video';
+    if (j.startsWith('audio/')) return 'audio';
+    if ((j.startsWith('text/') || j === 'application/json' || EXT_TEKS.includes(ext)) && f.saiz <= HAD_TEKS) return 'teks';
+    return null;
+  }
+
+  function gambarKadPemapar(f) {
+    if (!f.thumb) return lencanaFail(f);
+    const img = el('img', { class: 'pemapar-thumb', src: f.thumb, alt: '', referrerpolicy: 'no-referrer' });
+    img.addEventListener('error', () => img.replaceWith(lencanaFail(f)), { once: true });
+    return img;
+  }
+
+  const kadPemapar = (f, mesej) => el('div', { class: 'pemapar-kad' },
+    gambarKadPemapar(f),
+    el('strong', {}, f.nama),
+    el('p', {}, mesej),
+    el('button', { type: 'button', class: 'btn btn-utama', onclick: () => muatTurun(f) }, ikon('muatTurun'), el('span', {}, 'Muat turun')));
+
+  function lepasUrlPemapar() {
+    if (pemaparUrl) URL.revokeObjectURL(pemaparUrl);
+    pemaparUrl = '';
+  }
+
+  function bukaPemapar(f) {
+    if (!pemapar.open) bukaDialog(pemapar);
+    paparDalamPemapar(f);
+  }
+
+  async function paparDalamPemapar(f) {
+    const giliran = ++giliranPemapar;
+    pemaparFail = f;
+    const i = senaraiSemasa.findIndex((x) => x.id === f.id);
+    $('#pemapar-nama').textContent = f.nama;
+    $('#pemapar-info').textContent = [
+      i >= 0 && senaraiSemasa.length > 1 ? `${i + 1} / ${senaraiSemasa.length}` : '',
+      f.saiz > 0 ? saiz(f.saiz) : '', tarikh(f.tarikh), labelOleh(f.oleh),
+    ].filter(Boolean).join(' · ');
+    $('#pemapar-sebelum').disabled = i <= 0;
+    $('#pemapar-seterus').disabled = i < 0 || i >= senaraiSemasa.length - 1;
+    const kotak = $('#pemapar-isi');
+    const cara = caraPapar(f);
+    if (!cara || (f.saiz > HAD_PEMAPAR && !isGoogleDoc(f))) {
+      isi(kotak, kadPemapar(f, cara ? `Fail ni besar (${saiz(f.saiz)}). Muat turun untuk membukanya.` : 'Pratonton tidak tersedia untuk fail jenis ni.'));
+      lepasUrlPemapar();
+      return;
+    }
+    const teksMuat = el('span', {}, 'Memuatkan…');
+    isi(kotak, el('div', { class: 'pemapar-muat' }, el('span', { class: 'pemusing' }), teksMuat));
+    lepasUrlPemapar();
+    let data;
+    try {
+      data = await ambilFail(f, (p) => {
+        if (giliran === giliranPemapar) teksMuat.textContent = p == null ? 'Menyediakan PDF…' : `Memuatkan… ${Math.round(p * 100)}%`;
+      });
+    } catch (e) {
+      if (giliran === giliranPemapar && pemapar.open) isi(kotak, kadPemapar(f, mesejRalat(e)));
+      return;
+    }
+    if (giliran !== giliranPemapar || !pemapar.open) return;
+    const gagal = () => { if (giliran === giliranPemapar) isi(kotak, kadPemapar(f, 'Pelayar ni tak dapat memaparkan fail ni.')); };
+    let n;
+    if (cara === 'teks') {
+      n = el('pre', { tabindex: '0' }, await data.blob.text());
+      if (giliran !== giliranPemapar) return;
+    } else {
+      pemaparUrl = URL.createObjectURL(data.blob);
+      if (cara === 'gambar') n = el('img', { src: pemaparUrl, alt: f.nama });
+      else if (cara === 'pdf') n = el('iframe', { src: pemaparUrl, title: f.nama });
+      else if (cara === 'video') n = el('video', { src: pemaparUrl, controls: true, playsinline: true, autoplay: true });
+      else n = el('audio', { src: pemaparUrl, controls: true, autoplay: true });
+      n.addEventListener('error', gagal);
+    }
+    isi(kotak, n);
+    if (i >= 0) pramuat(i + 1);
+  }
+
+  // Ambil gambar seterusnya lebih awal supaya navigasi terasa segera
+  function pramuat(i) {
+    const f = senaraiSemasa[i];
+    if (f && caraPapar(f) === 'gambar' && f.saiz <= 15 * 1024 * 1024) ambilFail(f, () => {}).catch(() => {});
+  }
+
+  function navPemapar(arah) {
+    const i = senaraiSemasa.findIndex((x) => x.id === pemaparFail?.id);
+    const f = i >= 0 && senaraiSemasa[i + arah];
+    if (f) paparDalamPemapar(f);
+  }
+
+  // ---------- ZIP (tanpa mampatan; fail disimpan seperti asal) ----------
+  const JADUAL_CRC = (() => {
+    const t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      t[n] = c >>> 0;
+    }
+    return t;
+  })();
+  const crc32 = (bait) => {
+    let c = 0xffffffff;
+    for (let i = 0; i < bait.length; i++) c = JADUAL_CRC[(c ^ bait[i]) & 255] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  };
+
+  // entri: [{ nama, blob, tarikh }] → Blob ZIP
+  async function binaZip(entri) {
+    const enc = new TextEncoder();
+    const bahagian = [];
+    const pusat = [];
+    let ofset = 0;
+    for (const e of entri) {
+      const nama = enc.encode(e.nama);
+      const saizData = e.blob.size;
+      const crc = crc32(new Uint8Array(await e.blob.arrayBuffer()));
+      const d = new Date(e.tarikh || Date.now());
+      const masa = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+      const hari = ((Math.max(1980, d.getFullYear()) - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+      const lokal = new DataView(new ArrayBuffer(30));
+      lokal.setUint32(0, 0x04034b50, true);
+      lokal.setUint16(4, 20, true);
+      lokal.setUint16(6, 0x0800, true); // nama dalam UTF-8
+      lokal.setUint16(10, masa, true);
+      lokal.setUint16(12, hari, true);
+      lokal.setUint32(14, crc, true);
+      lokal.setUint32(18, saizData, true);
+      lokal.setUint32(22, saizData, true);
+      lokal.setUint16(26, nama.length, true);
+      bahagian.push(lokal, nama, e.blob);
+      const p = new DataView(new ArrayBuffer(46));
+      p.setUint32(0, 0x02014b50, true);
+      p.setUint16(4, 20, true);
+      p.setUint16(6, 20, true);
+      p.setUint16(8, 0x0800, true);
+      p.setUint16(12, masa, true);
+      p.setUint16(14, hari, true);
+      p.setUint32(16, crc, true);
+      p.setUint32(20, saizData, true);
+      p.setUint32(24, saizData, true);
+      p.setUint16(28, nama.length, true);
+      p.setUint32(42, ofset, true);
+      pusat.push(p, nama);
+      ofset += 30 + nama.length + saizData;
+    }
+    const saizPusat = pusat.reduce((n, x) => n + x.byteLength, 0);
+    const akhir = new DataView(new ArrayBuffer(22));
+    akhir.setUint32(0, 0x06054b50, true);
+    akhir.setUint16(8, entri.length, true);
+    akhir.setUint16(10, entri.length, true);
+    akhir.setUint32(12, saizPusat, true);
+    akhir.setUint32(16, ofset, true);
+    return new Blob([...bahagian, ...pusat, akhir], { type: 'application/zip' });
+  }
+
+  const namaSelamat = (s) => s.replace(/[\\/:*?"<>|]/g, '-').trim() || 'fail';
+  // Elak nama berganda dalam ZIP: "a.pdf", "a (2).pdf", ...
+  function namaUnik(laluan, dipakai) {
+    const titik = laluan.lastIndexOf('.');
+    const [asas, ext] = titik > laluan.lastIndexOf('/') + 1 ? [laluan.slice(0, titik), laluan.slice(titik)] : [laluan, ''];
+    let calon = laluan;
+    for (let n = 2; dipakai.has(calon.toLowerCase()); n++) calon = `${asas} (${n})${ext}`;
+    dipakai.add(calon.toLowerCase());
+    return calon;
+  }
+
+  // senarai: [{ f, laluan }] (laluan = nama folder dalam ZIP, atau '')
+  async function muatTurunZip(senarai, namaZip) {
+    if (!senarai.length) { toast('Tiada fail untuk dimuat turun.', 'info'); return; }
+    const jumlah = senarai.reduce((n, x) => n + (x.f.saiz || 0), 0);
+    if (jumlah > 2 * 1024 ** 3) { toast('Terlalu besar untuk satu ZIP (maksimum 2 GB). Muat turun sebahagian dahulu.', 'ralat'); return; }
+    if (jumlah > 500 * 1024 * 1024 && !confirm(`Jumlah saiz ${saiz(jumlah)}. Muat turun mungkin ambil masa yang lama. Teruskan?`)) return;
+    const entri = [];
+    const dipakai = new Set();
+    let siap = 0;
+    try {
+      for (const [i, { f, laluan }] of senarai.entries()) {
+        const lapor = (p) => toast(`Menyediakan ZIP · fail ${i + 1}/${senarai.length} · ${Math.round(((siap + (p || 0) * (f.saiz || 0)) / (jumlah || 1)) * 100)}%`, 'muat', true);
+        lapor(0);
+        const { blob, nama } = await ambilFail(f, lapor, false);
+        siap += f.saiz || 0;
+        entri.push({ nama: namaUnik(laluan ? `${namaSelamat(laluan)}/${namaSelamat(nama)}` : namaSelamat(nama), dipakai), blob, tarikh: f.tarikh });
+      }
+      toast('Menyediakan ZIP…', 'muat', true);
+      simpanBlob(await binaZip(entri), namaZip);
+      toast(`${namaZip} dimuat turun`, 'ok');
+    } catch (e) {
+      toast(mesejRalat(e), 'ralat');
+    }
+  }
+
+  function muatTurunFolder(id) {
+    const nama = namaFolder(id);
+    const fail = semua.filter((f) => f.folderId === id);
+    if (!fail.length) { toast('Folder ni kosong.', 'info'); return; }
+    muatTurunZip(susunFail(fail).map((f) => ({ f, laluan: nama })), `${namaSelamat(nama)}.zip`);
+  }
+
+  // ---------- Tindakan untuk item dipilih ----------
+  function bahagikanPilihan() {
+    const dipilih = [...pilihan.values()];
+    const folderDipilih = dipilih.filter((x) => x.jenis === 'folder').map((x) => x.item);
+    const idFolder = new Set(folderDipilih.map((f) => f.id));
+    // Fail dalam folder yang turut dipilih sudah termasuk bersama folder
+    const failDipilih = dipilih.filter((x) => x.jenis === 'fail' && !idFolder.has(x.item.folderId)).map((x) => x.item);
+    return { folderDipilih, failDipilih, idFolder };
+  }
+
+  function muatTurunPilihan() {
+    const { folderDipilih, failDipilih } = bahagikanPilihan();
+    if (!folderDipilih.length && failDipilih.length === 1) { muatTurun(failDipilih[0]); return; }
+    const senarai = [
+      ...folderDipilih.flatMap((fo) => susunFail(semua.filter((f) => f.folderId === fo.id)).map((f) => ({ f, laluan: fo.nama }))),
+      ...failDipilih.map((f) => ({ f, laluan: '' })),
+    ];
+    const nama = folderDipilih.length === 1 && !failDipilih.length ? folderDipilih[0].nama : `UPSI-DATA ${new Date().toISOString().slice(0, 10)}`;
+    muatTurunZip(senarai, `${namaSelamat(nama)}.zip`);
+  }
+
+  async function padamPilihan() {
+    const { folderDipilih, failDipilih, idFolder } = bahagikanPilihan();
+    const n = folderDipilih.length + failDipilih.length;
+    const dalamFolder = semua.filter((f) => idFolder.has(f.folderId)).length;
+    if (!confirm(`Padam ${n} item${dalamFolder ? ` (termasuk ${dalamFolder} fail dalam folder)` : ''}?\n\nIa akan masuk ke Sampah dan boleh dipulihkan dalam 30 hari.`)) return;
+    let siap = 0;
+    try {
+      for (const fo of folderDipilih) {
+        toast(`Memadam ${siap + 1}/${n}…`, 'muat', true);
+        await panggil('padamFolder', fo.id);
+        siap++;
+      }
+      for (const f of failDipilih) {
+        toast(`Memadam ${siap + 1}/${n}…`, 'muat', true);
+        await panggil('padamFail', f.id);
+        siap++;
+      }
+      toast(`${siap} item dipindah ke Sampah`, 'ok');
+    } catch (e) {
+      toast(`${siap ? `${siap} item dipadam. ` : ''}Gagal: ${mesejRalat(e)}`, 'ralat');
+    }
+    if (!token) return;
+    kosongkanPilihan();
+    if (idFolder.has(folderAktif)) folderAktif = '';
+    animasiSeterusnya = true;
+    await muat();
+  }
+
+  function pindahPilihan() {
+    const fail = bahagikanPilihan().failDipilih;
+    mintaTeks({
+      tajuk: `Pindah ${fail.length} fail`, label: 'Folder (pilih atau taip nama baru)', nilai: '', senarai: true, butang: 'Pindah',
+      ok: async (v) => {
+        const id = await idFolder(v);
+        let n = 0;
+        for (const f of fail) {
+          if (f.folderId === id) continue;
+          await panggil('pindahFail', f.id, id);
+          n++;
+        }
+        kosongkanPilihan();
+        toast(`${n} fail dipindah ke ${namaFolder(id)}`, 'ok');
+      },
+    });
+  }
+
+  // ---------- Sampah ----------
+  async function pulihkanItem(items) {
+    let berjaya = 0;
+    let keUtama = 0;
+    try {
+      for (const x of items) {
+        toast(items.length > 1 ? `Memulihkan ${berjaya + 1}/${items.length}…` : `Memulihkan ${x.nama}…`, 'muat', true);
+        const r = await panggil('pulihkan', x.id);
+        if (r && r.keUtama) keUtama++;
+        berjaya++;
+        sampah = sampah.filter((y) => y.id !== x.id);
+      }
+      const mesej = items.length > 1 ? `${berjaya} item dipulihkan` : `${items[0].nama} dipulihkan`;
+      toast(keUtama ? `${mesej}. ${keUtama} fail diletak di Utama kerana folder asalnya masih dalam Sampah.` : mesej, 'ok');
+    } catch (e) {
+      toast(`${berjaya ? `${berjaya} item dipulihkan. ` : ''}Gagal: ${mesejRalat(e)}`, 'ralat');
+    }
+    if (!token) return;
+    kosongkanPilihan();
+    if (paparanSampah) papar();
+  }
+
+  async function padamKekalItem(items) {
+    const apa = items.length > 1 ? `${items.length} item` : `"${items[0].nama}"`;
+    if (!confirm(`Padam kekal ${apa}?\n\nTindakan ni tidak boleh dibatalkan.`)) return;
+    let berjaya = 0;
+    try {
+      for (const x of items) {
+        toast(items.length > 1 ? `Memadam ${berjaya + 1}/${items.length}…` : 'Memadam…', 'muat', true);
+        await panggil('padamKekal', x.id);
+        berjaya++;
+        sampah = sampah.filter((y) => y.id !== x.id);
+      }
+      toast(items.length > 1 ? `${berjaya} item dipadam kekal` : `${items[0].nama} dipadam kekal`, 'ok');
+    } catch (e) {
+      toast(`${berjaya ? `${berjaya} item dipadam. ` : ''}Gagal: ${mesejRalat(e)}`, 'ralat');
+    }
+    if (!token) return;
+    kosongkanPilihan();
+    if (paparanSampah) papar();
+  }
+
+  async function kosongkanSampah() {
+    if (!sampah.length) return;
+    if (!confirm(`Padam kekal SEMUA ${sampah.length} item dalam Sampah?\n\nTindakan ni tidak boleh dibatalkan.`)) return;
+    $('#btn-kosongkan').disabled = true;
+    toast('Mengosongkan Sampah…', 'muat', true);
+    try {
+      const n = await panggil('kosongkanSampah');
+      sampah = [];
+      kosongkanPilihan();
+      animasiSeterusnya = true;
+      toast(`${n} item dipadam kekal`, 'ok');
+    } catch (e) {
+      toast(mesejRalat(e), 'ralat');
+    }
+    if (paparanSampah) papar();
   }
 
   // ---------- Latar belakang profil ----------
@@ -1027,7 +1692,7 @@
 
   async function padamFolder(id) {
     const n = semua.filter((x) => x.folderId === id).length;
-    if (!confirm(`Padam folder "${namaFolder(id)}"${n ? ` dan ${n} fail di dalamnya` : ''}?\n\nIa akan masuk ke Sampah Google Drive dan boleh dipulihkan dalam 30 hari.`)) return;
+    if (!confirm(`Padam folder "${namaFolder(id)}"${n ? ` dan ${n} fail di dalamnya` : ''}?\n\nIa akan masuk ke Sampah dan boleh dipulihkan dalam 30 hari.`)) return;
     toast('Memadam folder…', 'muat', true);
     try {
       await panggil('padamFolder', id);
@@ -1045,6 +1710,7 @@
       tajuk: 'Tukar nama fail', label: 'Nama baru', nilai: f.nama, pilih: titik > 0 ? [0, titik] : null,
       ok: async (v) => {
         await panggil('tukarNamaFail', f.id, v);
+        cacheBlob.delete(f.id);
         toast('Nama fail ditukar', 'ok');
       },
     });
@@ -1063,7 +1729,7 @@
   }
 
   async function padamFail(f) {
-    if (!confirm(`Padam "${f.nama}"?\n\nIa akan masuk ke Sampah Google Drive dan boleh dipulihkan dalam 30 hari.`)) return;
+    if (!confirm(`Padam "${f.nama}"?\n\nIa akan masuk ke Sampah dan boleh dipulihkan dalam 30 hari.`)) return;
     try {
       await panggil('padamFail', f.id);
     } catch (e) { toast(mesejRalat(e), 'ralat'); return; }
@@ -1127,6 +1793,7 @@
 
   function bukaUpload(items) {
     if (!items.length) return;
+    if (paparanSampah) bukaPaparan('');
     const d = $('#dialog-upload');
     if (d.open) { tambahItemUpload(items); return; }
     failUpload = [];
@@ -1303,6 +1970,45 @@
   $('#btn-profil-menu').addEventListener('click', (ev) => menuProfil(ev.currentTarget));
   $('#btn-logo').addEventListener('click', () => { $('#cari').value = ''; bukaPaparan(''); });
   $('#btn-baru').addEventListener('click', (ev) => menuBaru(ev.currentTarget));
+  $('#btn-sampah').addEventListener('click', () => (paparanSampah ? bukaPaparan('') : bukaSampah()));
+  $('#btn-kosongkan').addEventListener('click', kosongkanSampah);
+  $('#btn-pilih').addEventListener('click', () => {
+    if (modPilih) { kosongkanPilihan(); return; }
+    modPilih = 'butang';
+    kemasPilihan();
+  });
+  $('#btn-batal-pilih').addEventListener('click', kosongkanPilihan);
+  $('#btn-pilih-semua').addEventListener('click', pilihSemua);
+  $('#pemapar-sebelum').addEventListener('click', () => navPemapar(-1));
+  $('#pemapar-seterus').addEventListener('click', () => navPemapar(1));
+  $('#pemapar-muat-turun').addEventListener('click', () => { if (pemaparFail) muatTurun(pemaparFail); });
+  $('#pemapar-tab').addEventListener('click', () => { if (pemaparFail) bukaTabBaru(pemaparFail); });
+  pemapar.addEventListener('close', () => {
+    giliranPemapar++;
+    pemaparFail = null;
+    $('#pemapar-isi').replaceChildren();
+    lepasUrlPemapar();
+  });
+  // Leret kiri/kanan (sentuhan) untuk fail seterusnya; klik di ruang kosong untuk tutup
+  {
+    const kotak = $('#pemapar-isi');
+    let leret = null;
+    let baruLeret = false;
+    kotak.addEventListener('pointerdown', (ev) => { leret = ev.isPrimary && ev.pointerType !== 'mouse' ? { x: ev.clientX, y: ev.clientY } : null; });
+    kotak.addEventListener('pointercancel', () => { leret = null; });
+    kotak.addEventListener('pointerup', (ev) => {
+      if (!leret) return;
+      const dx = ev.clientX - leret.x;
+      const dy = ev.clientY - leret.y;
+      leret = null;
+      const dizum = window.visualViewport && visualViewport.scale > 1.01;
+      if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5 || dizum) return;
+      baruLeret = true;
+      setTimeout(() => { baruLeret = false; }, 350);
+      navPemapar(dx < 0 ? 1 : -1);
+    });
+    kotak.addEventListener('click', (ev) => { if (ev.target === kotak && !baruLeret) tutupDialog(pemapar); });
+  }
   $('#borang-profil').addEventListener('submit', simpanProfil);
   $('#borang-profil').elements.nama.addEventListener('input', () => { if (!pilihanProfil.gambar) paparPilihanProfil(false); });
   $('#btn-pilih-gambar').addEventListener('click', () => $('#input-gambar-profil').click());
@@ -1345,6 +2051,11 @@
       const d = [...document.querySelectorAll('dialog[open]')].pop();
       if (d) tutupDialog(d);
     }
+    if (pemapar.open && (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight') && !/VIDEO|AUDIO|INPUT/.test(document.activeElement.tagName)) {
+      ev.preventDefault();
+      navPemapar(ev.key === 'ArrowLeft' ? -1 : 1);
+    }
+    if (ev.key === 'Escape' && modPilih && !ev.defaultPrevented && !document.querySelector('dialog[open]') && menuEl.hidden) kosongkanPilihan();
   });
 
   // Seret & lepas fail ke mana-mana bahagian skrin (hanya bila dalam profil)
@@ -1377,5 +2088,11 @@
 
   aturMod();
   kenalPasti();
-  muatProfil();
+  (async () => {
+    // Semak sesi lama serentak dengan memuat profil supaya refresh lebih pantas
+    const s = bacaSesi();
+    const sah = s && s.token ? panggilTerus('semakSesi', s.token).then(() => true, () => false) : Promise.resolve(false);
+    await muatProfil();
+    if (!(await pulihSesi(s, sah))) tukarSkrin('skrin-profil');
+  })();
 })();

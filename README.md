@@ -2,29 +2,28 @@
 
 Storan fail peribadi, macam Google Drive versi ringkas. Upload fail kerja atau fail peribadi, susun dalam folder, buka dan muat turun dari mana-mana.
 
-- **Profil macam Netflix** (versi Google Drive): tiada login. Pilih profil dulu, tambah, edit atau padam profil, letak **gambar profil** sendiri, dan kunci profil dengan PIN 4 digit kalau nak.
-- **Upload senang**: tekan **⬆ Upload Fail** atau **📁 Upload Folder**, atau seret fail/folder ke mana-mana bahagian skrin.
+- **Profil macam Netflix**: tiada login. Pilih profil dulu, tambah, edit atau padam profil, letak **gambar profil** sendiri, dan kunci profil dengan PIN 4 digit kalau nak.
+- **Upload senang**: tekan **+ Baru → Upload fail / Upload folder**, atau seret fail/folder ke mana-mana bahagian skrin.
 - **Pratonton folder**: halaman utama tunjuk setiap folder sebagai kad dengan pratonton sehingga 4 gambar di dalamnya.
 - **Folder**: buat folder sendiri (cth. Kerja, Peribadi). Tukar nama atau padam folder.
 - **Urus fail**: buka, muat turun, tukar nama, pindah ke folder lain, padam.
-- **Pratonton gambar**, carian nama fail, dan susun ikut terbaru, nama atau saiz.
+- **Pemapar fail dalam website**: gambar, PDF (termasuk Google Docs/Sheets/Slides), video, audio dan fail teks dibuka dalam skrin penuh, bukan tab baru. Guna anak panah ← → atau leret untuk fail seterusnya.
+- **Sampah**: butang **Sampah** tunjuk fail dan folder yang dipadam. Pulihkan, padam kekal, atau kosongkan semua. Fail yang folder asalnya masih dalam Sampah dipulihkan ke Utama.
+- **Pilih banyak item**: tekan **Pilih** (atau tekan lama pada kad di telefon), kemudian muat turun, pindah atau padam semuanya sekali gus.
+- **Muat turun ZIP**: muat turun satu folder (menu ⋯ → *Muat turun (ZIP)*) atau item yang dipilih sebagai satu fail ZIP.
+- **Ingat profil**: refresh halaman tak perlu pilih profil atau masukkan PIN semula (selagi tab tak ditutup).
+- **Ikon di skrin utama telefon**: menu profil → *Pasang di skrin utama* tunjuk langkah untuk iPhone dan Android.
+- Carian nama fail, dan susun ikut terbaru, nama atau saiz.
 - Bahasa Melayu, sesuai untuk telefon dan desktop.
-- **Reka bentuk profesional & ringan** (versi Google Drive): ikon SVG, lencana jenis fail (PDF, DOC, XLS…), paparan **Grid / Senarai**, menu ⋯ untuk setiap fail dan folder, butang **+ Baru**, laluan navigasi, mod cerah/gelap ikut peranti.
+- **Reka bentuk profesional & ringan**: ikon SVG, lencana jenis fail (PDF, DOC, XLS…), paparan **Grid / Senarai**, menu ⋯ untuk setiap fail dan folder, butang **+ Baru**, laluan navigasi, mod cerah/gelap ikut peranti.
 - **Animasi halus**: peralihan skrin, kad masuk berperingkat, menu & dialog buka/tutup beranimasi, status upload setiap fail, rangka semasa memuat. Hanya guna `transform`/`opacity` supaya ringan.
 - **Latar belakang sendiri**: setiap profil boleh upload gambar latar (sehingga 4K / 3840px) melalui menu profil → *Latar belakang*.
 
-Ada dua versi:
-
-| | **Google Drive (Apps Script)** ← utama | Supabase (versi lama) |
-|---|---|---|
-| Folder | `apps-script/` | `public/lama/`, `supabase/` |
-| Ruang | Ikut kuota Google Drive akaun kau | 1 GB percuma |
-| Saiz fail | Tiada had praktikal (dihantar dalam cebisan 8MB) | 50 MB |
-| Alamat | [Web app](https://script.google.com/macros/s/AKfycbwyjEeiiLCLWmnDWMh_CVKp81ZiwsTlP8GgzsFzNrTnFCP6WkCdL9aIVKnlOl-ShXzW1g/exec) (juga `dynoz769.github.io/UPSI-DATA`, yang terus bawa ke sini) | `dynoz769.github.io/UPSI-DATA/lama/` |
+**Alamat website**: <https://dynoz769.github.io/UPSI-DATA/> (terus bawa ke [web app Apps Script](https://script.google.com/macros/s/AKfycbwyjEeiiLCLWmnDWMh_CVKp81ZiwsTlP8GgzsFzNrTnFCP6WkCdL9aIVKnlOl-ShXzW1g/exec)). Fail disimpan dalam Google Drive, jadi ruang ikut kuota Drive akaun kau dan tiada had saiz praktikal (fail dihantar dalam cebisan 8MB).
 
 ---
 
-# Versi Google Drive (Apps Script)
+# Cara ia berfungsi
 
 Fail disimpan dalam Google Drive akaun yang deploy script ni:
 
@@ -38,8 +37,20 @@ UPSI-DATA/
   _gambar-profil/  ← gambar profil (256px) dan latar belakang profil (sehingga 3840px)
 ```
 
+### Struktur repo
+```
+apps-script/
+  Code.gs          ← kod server (tampal ke Apps Script)
+  Index.html       ← antara muka (DIJANA, tampal ke Apps Script)
+  src/             ← sumber Index.html: body.html, gaya.css, app.js
+  bina.py          ← gabungkan src/ jadi Index.html
+public/            ← dynoz769.github.io/UPSI-DATA (bawa ke web app, ikon skrin utama)
+tests/             ← ujian automatik
+.github/workflows/ ← ujian.yml (ujian setiap push) dan deploy GitHub Pages
+```
+
 ### Kod sumber
-`Index.html` **dijana** daripada `apps-script/src/` (`body.html`, `gaya.css`, `app.js`). Untuk ubah rupa atau fungsi, edit fail dalam `src/`, kemudian jalankan:
+`Index.html` **dijana** daripada `apps-script/src/`. Untuk ubah rupa atau fungsi, edit fail dalam `src/`, kemudian jalankan:
 
 ```bash
 python3 apps-script/bina.py
@@ -47,13 +58,24 @@ python3 apps-script/bina.py
 
 Tampal `Index.html` yang baru ke Apps Script seperti biasa.
 
+### Ujian automatik
+Ujian menjalankan `Code.gs` sebenar dengan Google Drive palsu (`tests/gasmock.mjs`), dan `Index.html` sebenar dalam Chromium (Playwright): profil & PIN, akses antara profil, upload bercebisan, Sampah, pemapar, pilih banyak, ZIP, dan sesi selepas refresh.
+
+```bash
+npm install
+npx playwright install chromium   # sekali sahaja
+npm test
+```
+
+Ujian yang sama berjalan automatik di GitHub (tab **Actions → Ujian**) untuk setiap push dan pull request. Ia juga gagal kalau `Index.html` tidak dijana semula selepas `src/` diubah.
+
 ### Keserasian peranti
 - Telefon kecil (320px) hingga skrin 4K; menu jadi helaian bawah di telefon; sasaran sentuh ≥ 40px; input 16px (elak zum iOS); kawasan notch iPhone (`safe-area-inset`).
 - Mod cerah/gelap ikut tetapan peranti.
 - Pelayar tanpa `<dialog>` atau `backdrop-filter` tetap berfungsi (ada fallback).
 - Pengguna yang set *Kurangkan gerakan* (prefers-reduced-motion) dapat paparan tanpa animasi.
 
-Bila website dibuka, skrin **"Siapa yang guna?"** keluar dan kau pilih profil. Setiap profil hanya nampak fail sendiri. Tekan **Tambah profil** untuk buat profil baru (nama, foto pilihan, warna, PIN pilihan). Tekan **Urus Profil** dan pilih profil untuk tukar nama/gambar atau padam profil (perlu PIN kalau profil berkunci).
+Bila website dibuka, skrin **"Siapa yang guna?"** keluar dan kau pilih profil. Profil diingat sehingga tab ditutup (sesi tamat selepas 6 jam). Setiap profil hanya nampak fail sendiri. Tekan **Tambah profil** untuk buat profil baru (nama, foto pilihan, warna, PIN pilihan). Tekan **Urus Profil** dan pilih profil untuk tukar nama/gambar atau padam profil (perlu PIN kalau profil berkunci).
 
 **Upload Folder**: folder yang dipilih atau diseret jadi folder dengan nama sama dalam profil. Subfolder diratakan, cth. `hari2/hutan.png` jadi `hari2 - hutan.png`.
 
@@ -100,67 +122,4 @@ Tampal kod baru → **Save** → **Deploy → Manage deployments** → ✏️ �
 ## ⚠️ Nota akaun MOE / DELIMa
 - Akaun ni milik KPM. Admin boleh akses fail, dan akaun mungkin **dipadam bila kau tamat sekolah**. Simpan salinan fail penting di tempat lain juga.
 - Kuota ruang ditetapkan oleh admin. Semak di <https://drive.google.com/settings/storage>.
-- Fail yang dipadam masuk **Sampah Google Drive** dan boleh dipulihkan dalam 30 hari.
-
----
-
-# Versi Supabase (lama)
-
-## Struktur
-
-```
-public/
-  index.html       ← halaman yang terus bawa ke web app Apps Script
-  lama/            ← website versi Supabase
-    index.html
-    css/style.css
-    js/config.js   ← URL & key Supabase
-    js/app.js
-supabase/setup.sql ← skrip setup database + storage
-.github/workflows/jekyll-gh-pages.yml ← deploy folder public/ ke GitHub Pages
-```
-
-Fail disimpan dalam Supabase Storage di `<id pengguna>/<folder>/<nama fail>`. Tiada database diperlukan untuk fail.
-
-## Cara setup (±15 minit, semua percuma)
-
-### 1. Buat projek Supabase
-1. Daftar di <https://supabase.com> dan tekan **New project**. Pilih region **Southeast Asia (Singapore)**.
-2. Lepas projek siap, pergi ke **SQL Editor → New query**, salin semua isi `supabase/setup.sql`, dan tekan **Run**.
-   Skrip ni buat bucket private `fail-tugasan` dan semua polisi keselamatan.
-
-### 2. Buat akaun kau sendiri (dan tutup pendaftaran awam)
-1. **Authentication → Users → Add user → Create new user**. Masukkan emel + kata laluan, tandakan **Auto Confirm User**.
-2. **Authentication → Sign In / Providers → Email**: matikan **Allow new users to sign up**.
-   Lepas ni, cuma akaun kau saja boleh log masuk.
-
-### 3. Sambungkan website ke Supabase
-1. **Project Settings → API**: salin **Project URL** dan **anon public key**.
-2. Masukkan dalam `public/lama/js/config.js`.
-   > Anon key memang direka untuk didedahkan dalam frontend. Fail kau dilindungi oleh login + polisi keselamatan, bukan oleh key ni.
-   > **Jangan sekali-kali** letak `service_role` key di sini.
-
-### 4. Letak online
-**Pilihan A: GitHub Pages** (repo kena *public* untuk akaun GitHub percuma)
-1. Repo → **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-2. Setiap push ke branch `claude/determined-davinci-4kv5sx` akan deploy automatik (tukar di `.github/workflows/jekyll-gh-pages.yml` kalau nak guna branch lain). Alamat: `https://dynoz769.github.io/UPSI-DATA/`.
-
-**Pilihan B: Cloudflare Pages / Netlify** (percuma, boleh guna repo *private*)
-1. Sambungkan repo ni, tetapkan **Build command**: kosong, **Output directory**: `public/lama`.
-2. Deploy. Dapat alamat macam `upsi-data.pages.dev`.
-
-> Kod website boleh nampak public, tapi tu tak apa: tanpa log masuk, tiada sesiapa boleh buka fail kau.
-
-### 5. Tambah alamat website ke Supabase
-**Authentication → URL Configuration → Site URL**: masukkan alamat website kau (dari langkah 4).
-
-## Cuba di komputer sendiri
-```bash
-cd public/lama
-python3 -m http.server 8000
-# buka http://localhost:8000
-```
-
-## Had pelan percuma Supabase
-- Storage 1 GB, fail maks 50 MB setiap satu.
-- Projek akan *pause* kalau tak digunakan 7 hari. Log masuk ke dashboard Supabase dan tekan **Restore** untuk hidupkan semula (fail tak hilang).
+- Fail yang dipadam masuk **Sampah** dan boleh dipulihkan dari website (butang **Sampah**) dalam 30 hari. Selepas itu Google memadamnya secara kekal.

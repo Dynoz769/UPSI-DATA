@@ -1,8 +1,14 @@
   <!-- Latar: kecerunan lembut lalai, atau gambar sendiri setiap profil -->
   <div id="latar" class="latar" aria-hidden="true"><div id="latar-imej" class="latar-imej"></div></div>
 
+  <!-- Skrin: pembuka -->
+  <section id="skrin-mula" class="skrin skrin-mula" aria-label="Memuatkan">
+    <span class="logo logo-mula" aria-hidden="true"></span>
+    <span class="pemusing"></span>
+  </section>
+
   <!-- Skrin: pilih profil -->
-  <section id="skrin-profil" class="skrin skrin-profil">
+  <section id="skrin-profil" class="skrin skrin-profil" hidden>
     <div class="profil-bekas">
       <div class="jenama jenama-besar"><span class="logo" aria-hidden="true"></span><span>UPSI-DATA</span></div>
       <h1 id="tajuk-profil">Siapa yang guna?</h1>
@@ -38,6 +44,12 @@
       <div class="kepala-halaman">
         <nav id="serbuk" class="serbuk" aria-label="Lokasi"></nav>
         <div class="tindakan-halaman">
+          <button id="btn-pilih" class="btn btn-garis btn-ikon-teks" type="button" title="Pilih beberapa item">
+            <svg class="ik" data-ikon="pilih"></svg><span>Pilih</span>
+          </button>
+          <button id="btn-sampah" class="btn btn-garis btn-ikon-teks" type="button" title="Sampah">
+            <svg class="ik" data-ikon="sampah"></svg><span>Sampah</span>
+          </button>
           <div class="segmen" role="group" aria-label="Jenis paparan">
             <span class="segmen-penunjuk" aria-hidden="true"></span>
             <button type="button" class="segmen-btn" data-paparan="grid" aria-label="Paparan grid" title="Grid"><svg class="ik" data-ikon="grid"></svg></button>
@@ -51,12 +63,19 @@
               <option value="saiz">Saiz terbesar</option>
             </select>
           </label>
+          <button id="btn-kosongkan" class="btn btn-bahaya-isi" type="button" hidden>
+            <svg class="ik" data-ikon="sampah"></svg><span>Kosongkan</span>
+          </button>
           <button id="btn-baru" class="btn btn-utama" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Baru: upload fail, upload folder atau folder baru">
             <svg class="ik" data-ikon="tambah"></svg><span>Baru</span>
           </button>
         </div>
       </div>
       <p id="ruang" class="ruang"></p>
+      <p id="nota-sampah" class="nota-sampah" hidden>
+        <svg class="ik" data-ikon="info"></svg>
+        <span>Item dalam Sampah boleh dipulihkan. Google memadamnya secara kekal selepas 30 hari.</span>
+      </p>
 
       <section id="bahagian-folder" class="bahagian" hidden>
         <h2 class="tajuk-bahagian">Folder</h2>
@@ -75,6 +94,31 @@
       <input id="input-folder" type="file" webkitdirectory multiple hidden>
     </main>
   </section>
+
+  <!-- Bar tindakan untuk item yang dipilih -->
+  <div id="bar-pilih" class="bar-pilih" role="toolbar" aria-label="Tindakan untuk item dipilih" hidden>
+    <button id="btn-batal-pilih" class="btn-ikon" type="button" aria-label="Batal pilihan"><svg class="ik" data-ikon="tutup"></svg></button>
+    <span id="bil-pilih" class="bil-pilih" aria-live="polite"></span>
+    <button id="btn-pilih-semua" class="btn btn-teks btn-kecil" type="button">Pilih semua</button>
+    <span class="bar-pilih-ruang"></span>
+    <div id="tindakan-pilih" class="tindakan-pilih"></div>
+  </div>
+
+  <!-- Pemapar fail -->
+  <dialog id="pemapar" class="pemapar" aria-labelledby="pemapar-nama">
+    <div class="pemapar-atas">
+      <button type="button" class="btn-ikon" data-tutup aria-label="Tutup pemapar"><svg class="ik" data-ikon="tutup"></svg></button>
+      <div class="pemapar-tajuk">
+        <span id="pemapar-nama" class="pemapar-nama"></span>
+        <span id="pemapar-info" class="pemapar-info"></span>
+      </div>
+      <button id="pemapar-tab" type="button" class="btn-ikon" aria-label="Buka dalam tab baru" title="Buka dalam tab baru"><svg class="ik" data-ikon="buka"></svg></button>
+      <button id="pemapar-muat-turun" type="button" class="btn-ikon" aria-label="Muat turun" title="Muat turun"><svg class="ik" data-ikon="muatTurun"></svg></button>
+    </div>
+    <div id="pemapar-isi" class="pemapar-isi"></div>
+    <button id="pemapar-sebelum" type="button" class="pemapar-nav kiri" aria-label="Fail sebelumnya"><svg class="ik" data-ikon="kiri"></svg></button>
+    <button id="pemapar-seterus" type="button" class="pemapar-nav kanan" aria-label="Fail seterusnya"><svg class="ik" data-ikon="kanan"></svg></button>
+  </dialog>
 
   <!-- Menu timbul (dikongsi) -->
   <div id="menu-latar" class="menu-latar" hidden></div>

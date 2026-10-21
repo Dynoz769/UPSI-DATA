@@ -2,31 +2,117 @@
 <html lang="ms">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="robots" content="noindex, nofollow">
   <title>UPSI-DATA</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📁</text></svg>">
-  <!-- Website utama kini di Google Apps Script (lihat apps-script/ dalam repo) -->
-  <meta http-equiv="refresh" content="0; url=https://script.google.com/macros/s/AKfycbwyjEeiiLCLWmnDWMh_CVKp81ZiwsTlP8GgzsFzNrTnFCP6WkCdL9aIVKnlOl-ShXzW1g/exec">
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="apple-mobile-web-app-title" content="UPSI-DATA">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="ikon/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="ikon/ikon-192.png">
+  <link rel="apple-touch-icon" href="ikon/apple-touch-icon.png">
+  <script>
+    // Website utama ialah web app Google Apps Script (lihat apps-script/ dalam repo).
+    // Halaman ni terus bawa ke sana, kecuali halaman pasang ikon (?pasang).
+    var APP = 'https://script.google.com/macros/s/AKfycbwyjEeiiLCLWmnDWMh_CVKp81ZiwsTlP8GgzsFzNrTnFCP6WkCdL9aIVKnlOl-ShXzW1g/exec';
+    var PASANG = /[?&]pasang\b/.test(location.search);
+    if (!PASANG) location.replace(APP);
+  </script>
+  <noscript><meta http-equiv="refresh" content="0; url=https://script.google.com/macros/s/AKfycbwyjEeiiLCLWmnDWMh_CVKp81ZiwsTlP8GgzsFzNrTnFCP6WkCdL9aIVKnlOl-ShXzW1g/exec"></noscript>
   <style>
-    :root { --bg: #f5f6fa; --text: #1c1f2a; --muted: #6b7183; --primary: #3b4fd8; color-scheme: light; }
+    :root {
+      --bg: #f4f5f8; --permukaan: #fff; --garis: #e4e7ec; --teks: #101828; --teks-2: #475467; --utama: #4f46e5; --utama-lembut: #eef0ff;
+      color-scheme: light;
+    }
     @media (prefers-color-scheme: dark) {
-      :root:not([data-theme="light"]) { --bg: #111318; --text: #e8eaf1; --muted: #9298ab; --primary: #7083ff; color-scheme: dark; }
+      :root {
+        --bg: #0b0d12; --permukaan: #151922; --garis: #262b36; --teks: #f2f4f7; --teks-2: #a3aab8; --utama: #8b87ff; --utama-lembut: rgba(124, 120, 255, .14);
+        color-scheme: dark;
+      }
     }
+    * { box-sizing: border-box; }
     body {
-      margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px; box-sizing: border-box;
-      background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; text-align: center;
+      margin: 0; min-height: 100vh; min-height: 100dvh; display: grid; place-items: center;
+      padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+      background: var(--bg); color: var(--teks); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     }
-    a { color: var(--primary); }
-    .pudar { color: var(--muted); font-size: .9em; }
+    .kad {
+      width: min(440px, 100%); padding: 28px 24px; text-align: center;
+      background: var(--permukaan); border: 1px solid var(--garis); border-radius: 20px; box-shadow: 0 12px 32px -12px rgba(16, 24, 40, .18);
+      animation: naik .36s cubic-bezier(.2, .8, .2, 1) both;
+    }
+    @keyframes naik { from { opacity: 0; transform: translateY(10px); } }
+    @media (prefers-reduced-motion: reduce) { .kad { animation: none; } }
+    .logo { display: block; width: 72px; height: 72px; margin: 0 auto 12px; }
+    h1 { margin: 0 0 4px; font-size: 1.45rem; letter-spacing: -.01em; }
+    .sub { margin: 0 0 20px; color: var(--teks-2); }
+    a { color: var(--utama); }
+    section { margin: 0 0 12px; padding: 14px 16px; text-align: left; border: 1px solid var(--garis); border-radius: 14px; }
+    section.kini { border-color: var(--utama); background: var(--utama-lembut); }
+    h2 { margin: 0 0 6px; font-size: .95rem; }
+    ol { margin: 0; padding-left: 20px; color: var(--teks-2); font-size: .92rem; }
+    li + li { margin-top: 4px; }
+    b { color: var(--teks); }
+    .ik { width: 16px; height: 16px; vertical-align: -3px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; width: 100%; min-height: 46px; margin-top: 8px;
+      border-radius: 12px; background: var(--utama); color: #fff; font-weight: 600; text-decoration: none;
+    }
+    .btn:active { transform: scale(.98); }
+    [hidden] { display: none !important; }
   </style>
 </head>
 <body>
-  <div>
-    <h1>📁 UPSI-DATA</h1>
-    <p>Membawa kau ke website…</p>
-    <p><a href="https://script.google.com/macros/s/AKfycbwyjEeiiLCLWmnDWMh_CVKp81ZiwsTlP8GgzsFzNrTnFCP6WkCdL9aIVKnlOl-ShXzW1g/exec">Tekan sini kalau tak bergerak</a></p>
-    <p class="pudar">Versi lama (Supabase): <a href="lama/">lama/</a></p>
-  </div>
+  <main class="kad">
+    <img class="logo" src="ikon/ikon-192.png" alt="" width="72" height="72">
+    <h1>UPSI-DATA</h1>
+
+    <div id="bawa">
+      <p class="sub">Membawa kau ke website…</p>
+      <a href="https://script.google.com/macros/s/AKfycbwyjEeiiLCLWmnDWMh_CVKp81ZiwsTlP8GgzsFzNrTnFCP6WkCdL9aIVKnlOl-ShXzW1g/exec">Tekan sini kalau tak bergerak</a>
+    </div>
+
+    <div id="pasang" hidden>
+      <p class="sub">Letak UPSI-DATA di skrin utama supaya boleh dibuka dengan satu ketik, macam app.</p>
+      <div id="langkah">
+        <section data-os="ios">
+          <h2>iPhone / iPad</h2>
+          <ol>
+            <li>Tekan butang <b>Kongsi</b> <svg class="ik" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4"/><path d="m8 8 4-4 4 4"/><path d="M6 11H5v9h14v-9h-1"/></svg> pada bar pelayar.</li>
+            <li>Pilih <b>Add to Home Screen</b> (Tambah ke Skrin Utama).</li>
+            <li>Tekan <b>Add</b> (Tambah).</li>
+          </ol>
+        </section>
+        <section data-os="android">
+          <h2>Android (Chrome)</h2>
+          <ol>
+            <li>Tekan menu <b>⋮</b> di atas kanan.</li>
+            <li>Pilih <b>Add to Home screen</b> (Tambah ke skrin utama).</li>
+            <li>Tekan <b>Add</b> (Tambah).</li>
+          </ol>
+        </section>
+        <section data-os="desktop">
+          <h2>Komputer</h2>
+          <ol>
+            <li>Tekan <b>Ctrl + D</b> (Mac: <b>⌘ + D</b>) untuk simpan sebagai bookmark.</li>
+          </ol>
+        </section>
+      </div>
+      <a class="btn" href="https://script.google.com/macros/s/AKfycbwyjEeiiLCLWmnDWMh_CVKp81ZiwsTlP8GgzsFzNrTnFCP6WkCdL9aIVKnlOl-ShXzW1g/exec">Buka UPSI-DATA</a>
+    </div>
+  </main>
+  <script>
+    if (PASANG) {
+      document.getElementById('bawa').hidden = true;
+      document.getElementById('pasang').hidden = false;
+      var ua = navigator.userAgent;
+      var os = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? 'ios' : /Android/.test(ua) ? 'android' : 'desktop';
+      var semasa = document.querySelector('[data-os="' + os + '"]');
+      semasa.classList.add('kini');
+      document.getElementById('langkah').prepend(semasa);
+      // Alamat tanpa ?pasang supaya ikon di skrin utama terus buka website
+      history.replaceState(null, '', location.pathname);
+    }
+  </script>
 </body>
 </html>
