@@ -1,10 +1,11 @@
 # 📚 UPSI-DATA
 
-Website peribadi untuk simpan dan urus semua assignment UPSI: tajuk, kursus, semester, tarikh hantar, status, markah dan fail (PDF, Word, slide, gambar, zip).
+Website peribadi untuk simpan dan urus assignment UPSI dan barang-barang lain (nota kuliah, slaid, sijil, dokumen peribadi, gambar, projek), lengkap dengan fail (PDF, Word, slide, gambar, zip).
 
 - **Private**: kena log masuk. Data dan fail hanya boleh diakses oleh akaun kau (Supabase Row Level Security + bucket private).
 - **Upload terus dari website**: seret dan lepas fail, banyak fail sekali gus (maks 50MB setiap satu).
-- **Carian & tapisan**: ikut semester, status, kod kursus, tag, nama fail.
+- **Kategori**: tab untuk setiap kategori. Pilih dari senarai atau taip kategori baru sendiri. Medan tarikh hantar, status dan markah hanya untuk kategori *Tugasan*.
+- **Carian & tapisan**: ikut kategori, semester, status, kod kursus, tag, nama fail.
 - **Peringatan tarikh**: tugasan yang lewat atau tinggal ≤ 3 hari ditanda.
 - Bahasa Melayu, sesuai untuk telefon dan desktop, ada mod gelap.
 
@@ -16,7 +17,8 @@ public/            ← website (ini yang dihoskan)
   css/style.css
   js/config.js     ← isi URL & key Supabase di sini
   js/app.js
-supabase/setup.sql ← skrip database + storage
+supabase/setup.sql ← skrip database + storage (projek baru)
+supabase/02-kategori.sql ← kemas kini untuk projek yang dibuat sebelum ada kategori
 .github/workflows/jekyll-gh-pages.yml ← deploy folder public/ ke GitHub Pages
 ```
 
@@ -26,6 +28,7 @@ supabase/setup.sql ← skrip database + storage
 1. Daftar di <https://supabase.com> dan tekan **New project**. Pilih region **Southeast Asia (Singapore)**.
 2. Lepas projek siap, pergi ke **SQL Editor → New query**, salin semua isi `supabase/setup.sql`, dan tekan **Run**.
    Skrip ni buat jadual `tugasan`, bucket private `fail-tugasan` dan semua polisi keselamatan.
+3. Kalau projek kau dibuat **sebelum** ada ciri kategori, jalankan juga `supabase/02-kategori.sql` dengan cara yang sama. Data lama kekal dan masuk kategori *Tugasan*.
 
 ### 2. Buat akaun kau sendiri (dan tutup pendaftaran awam)
 1. **Authentication → Users → Add user → Create new user**. Masukkan emel + kata laluan, tandakan **Auto Confirm User**.

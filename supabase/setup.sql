@@ -5,6 +5,7 @@
 create table if not exists public.tugasan (
   id            uuid primary key default gen_random_uuid(),
   user_id       uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  kategori      text not null default 'Tugasan',
   tajuk         text not null,
   kod_kursus    text,
   nama_kursus   text,
@@ -12,7 +13,7 @@ create table if not exists public.tugasan (
   pensyarah     text,
   jenis         text,
   tarikh_hantar date,
-  status        text not null default 'Belum Mula'
+  status        text default 'Belum Mula'
                 check (status in ('Belum Mula', 'Dalam Proses', 'Siap', 'Dihantar')),
   markah        text,
   nota          text,
@@ -23,6 +24,7 @@ create table if not exists public.tugasan (
 );
 
 create index if not exists tugasan_user_idx on public.tugasan (user_id);
+create index if not exists tugasan_kategori_idx on public.tugasan (user_id, kategori);
 
 -- Kemas kini updated_at secara automatik
 create or replace function public.set_updated_at()

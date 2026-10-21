@@ -9,6 +9,15 @@
     'Dihantar': 'st-hantar',
   };
 
+  // Cadangan kategori; kategori lain boleh ditaip sendiri dalam borang
+  const KATEGORI_ASAS = ['Tugasan', 'Nota Kuliah', 'Slaid', 'Sijil', 'Dokumen Peribadi', 'Gambar', 'Projek', 'Lain-lain'];
+  const IKON_KATEGORI = {
+    'Tugasan': '📝', 'Nota Kuliah': '📒', 'Slaid': '📊', 'Sijil': '🏅',
+    'Dokumen Peribadi': '🪪', 'Gambar': '🖼️', 'Projek': '🛠️', 'Lain-lain': '📦',
+  };
+  const ikonKat = (k) => IKON_KATEGORI[k] || '📁';
+  const TUGASAN = 'Tugasan';
+
   const $ = (s, el = document) => el.querySelector(s);
   const cfg = window.UPSI_CONFIG || {};
 
@@ -17,6 +26,8 @@
   let pengguna = null;
   let semua = [];
   let editId = null;
+  let tabAktif = '';
+  try { tabAktif = localStorage.getItem('upsi-tab') || ''; } catch { /* tiada storage */ }
   let failSedia = [];   // fail yang sudah ada pada tugasan yang sedang diedit
   let failBuang = [];   // fail sedia yang ditanda untuk dipadam
   let failBaru = [];    // File objek yang belum dimuat naik
@@ -85,6 +96,7 @@
     if (/Invalid login credentials/i.test(m)) return 'Emel atau kata laluan salah.';
     if (/Email not confirmed/i.test(m)) return 'Emel belum disahkan. Semak inbox kau.';
     if (/exceeded the maximum allowed size|Payload too large/i.test(m)) return 'Fail terlalu besar (had 50MB).';
+    if (/kategori/i.test(m) && /column|schema/i.test(m)) return 'Database belum dikemas kini. Jalankan supabase/02-kategori.sql dalam Supabase SQL Editor.';
     if (/Failed to fetch|NetworkError/i.test(m)) return 'Tiada sambungan internet atau Supabase tidak dapat dicapai.';
     return m;
   };
@@ -118,13 +130,22 @@
   async function muat() {
     const { data, error } = await sb.from('tugasan').select('*');
     if (error) { toast(mesejRalat(error), true); return; }
-    semua = data || [];
-    kemasPilihanSemester();
+    semua = (data || []).map((t) => ({ ...t, kategori: t.kategori || TUGASAN }));
+    kemasPilihan();
     papar();
   }
 
   // ---------- Paparan ----------
-  function kemasPilihanSemester() {
+  function senaraiKategori() {
+    const ada = new Set(semua.map((t) => t.kategori));
+    return [...KATEGORI_ASAS.filter((k) => ada.has(k)), ...[...ada].filter((k) => !KATEGORI_ASAS.includes(k)).sort()];
+  }
+
+  function kemasPilihan() {
+    const ada = senaraiKategori();
+    if (tabAktif && !ada.includes(tabAktif)) tabAktif = '';
+    $('#senarai-kategori').replaceChildren(...[...new Set([...KATEGORI_ASAS, ...ada])].map((k) => el('option', {}, k)));
+
     const sems = [...new Set(semua.map((t) => t.semester).filter(Boolean))].sort().reverse();
     const sel = $('#tapis-semester');
     const nilai = sel.value;
@@ -140,10 +161,11 @@
     const susun = $('#susun').value;
 
     const hasil = semua.filter((t) => {
+      if (tabAktif && t.kategori !== tabAktif) return false;
       if (sem && t.semester !== sem) return false;
       if (st && t.status !== st) return false;
       if (!q) return true;
-      return [t.tajuk, t.kod_kursus, t.nama_kursus, t.pensyarah, t.jenis, t.nota, ...(t.tag || []), ...(t.fail || []).map((f) => f.nama)]
+      return [t.kategori, t.tajuk, t.kod_kursus, t.nama_kursus, t.pensyarah, t.jenis, t.nota, ...(t.tag || []), ...(t.fail || []).map((f) => f.nama)]
         .filter(Boolean).join(' ').toLowerCase().includes(q);
     });
 
@@ -157,34 +179,55 @@
 
   function papar() {
     const jumlahFail = semua.reduce((n, t) => n + (t.fail?.length || 0), 0);
-    const belum = semua.filter((t) => t.status !== 'Dihantar').length;
-    const lewat = semua.filter((t) => t.status !== 'Dihantar' && bakiHari(t.tarikh_hantar) < 0).length;
+    const tugasan = semua.filter((t) => t.kategori === TUGASAN);
+    const belum = tugasan.filter((t) => t.status !== 'Dihantar').length;
+    const lewat = tugasan.filter((t) => t.status !== 'Dihantar' && bakiHari(t.tarikh_hantar) < 0).length;
     $('#statistik').replaceChildren(
-      kadStat('Jumlah tugasan', semua.length),
-      kadStat('Belum dihantar', belum),
+      kadStat('Jumlah item', semua.length),
+      kadStat('Tugasan belum dihantar', belum),
       kadStat('Lewat', lewat, lewat ? 'amaran' : ''),
       kadStat('Fail disimpan', jumlahFail),
     );
 
+    const kategori = senaraiKategori();
+    const tab = (nilai, label, n) => el('button', {
+      class: `tab ${tabAktif === nilai ? 'aktif' : ''}`,
+      onclick: () => {
+        tabAktif = nilai;
+        try { localStorage.setItem('upsi-tab', nilai); } catch { /* tiada storage */ }
+        papar();
+      },
+    }, label, el('span', { class: 'tab-bil' }, String(n)));
+    $('#tab-kategori').replaceChildren(
+      tab('', '🗂️ Semua', semua.length),
+      ...kategori.map((k) => tab(k, `${ikonKat(k)} ${k}`, semua.filter((t) => t.kategori === k).length)),
+    );
+    $('#tab-kategori').hidden = kategori.length < 2 && !tabAktif;
+    // Tapisan status hanya bermakna untuk tugasan
+    const st = $('#tapis-status');
+    st.hidden = !!tabAktif && tabAktif !== TUGASAN;
+    if (st.hidden) st.value = '';
+
     const senarai = ditapis();
-    $('#senarai').replaceChildren(...senarai.map(kadTugasan));
+    $('#senarai').replaceChildren(...senarai.map(kadItem));
     const k = $('#kosong');
     k.hidden = senarai.length > 0;
     k.innerHTML = semua.length
-      ? 'Tiada tugasan sepadan dengan carian/tapisan.'
-      : 'Tiada tugasan lagi. Tekan <b>+ Tugasan Baru</b> untuk mula.';
+      ? 'Tiada item sepadan dengan carian/tapisan.'
+      : 'Belum ada apa-apa lagi. Tekan <b>+ Tambah Baru</b> untuk mula.';
   }
 
   const kadStat = (label, nilai, kelas = '') =>
     el('div', { class: `stat ${kelas}` }, el('div', { class: 'stat-nilai' }, String(nilai)), el('div', { class: 'stat-label' }, label));
 
-  function kadTugasan(t) {
+  function kadItem(t) {
+    const isTugasan = t.kategori === TUGASAN;
     const baki = bakiHari(t.tarikh_hantar);
     let tarikhTeks = null;
     if (t.tarikh_hantar) {
       let ket = '';
       let kelas = '';
-      if (t.status !== 'Dihantar' && baki !== null) {
+      if (isTugasan && t.status !== 'Dihantar' && baki !== null) {
         if (baki < 0) { ket = ` · lewat ${-baki} hari`; kelas = 'lewat'; }
         else if (baki === 0) { ket = ' · hari ini!'; kelas = 'dekat'; }
         else if (baki <= 3) { ket = ` · ${baki} hari lagi`; kelas = 'dekat'; }
@@ -195,8 +238,9 @@
     return el('article', { class: 'kad' },
       el('div', { class: 'kad-atas' },
         el('div', { class: 'lencana-baris' },
+          !tabAktif && el('span', { class: 'lencana kategori' }, `${ikonKat(t.kategori)} ${t.kategori}`),
           t.kod_kursus && el('span', { class: 'lencana kursus' }, t.kod_kursus),
-          el('span', { class: `lencana ${STATUS_KELAS[t.status] || ''}` }, t.status),
+          isTugasan && t.status && el('span', { class: `lencana ${STATUS_KELAS[t.status] || ''}` }, t.status),
           t.jenis && el('span', { class: 'lencana' }, t.jenis),
         ),
         el('div', { class: 'kad-aksi' },
@@ -281,37 +325,55 @@
     failSedia = t ? [...(t.fail || [])] : [];
     failBuang = [];
     failBaru = [];
-    $('#tajuk-borang').textContent = t ? 'Edit Tugasan' : 'Tugasan Baru';
+    $('#tajuk-borang').textContent = t ? 'Edit' : 'Tambah Baru';
     $('#ralat-borang').hidden = true;
 
     if (t) {
-      for (const k of ['tajuk', 'kod_kursus', 'nama_kursus', 'semester', 'pensyarah', 'jenis', 'tarikh_hantar', 'status', 'markah', 'nota']) {
+      for (const k of ['kategori', 'tajuk', 'kod_kursus', 'nama_kursus', 'semester', 'pensyarah', 'jenis', 'tarikh_hantar', 'status', 'markah', 'nota']) {
         b.elements[k].value = t[k] ?? '';
       }
       b.elements.tag.value = (t.tag || []).join(', ');
+      b.elements.status.value = t.status || 'Belum Mula';
     } else {
+      b.elements.kategori.value = tabAktif || TUGASAN;
       // Isi semester terakhir digunakan untuk jimat masa
       const terkini = [...semua].sort((x, y) => y.created_at.localeCompare(x.created_at))[0];
       if (terkini?.semester) b.elements.semester.value = terkini.semester;
     }
+    kemasMedanKategori();
     paparFailBorang();
     $('#dialog-borang').showModal();
     b.elements.tajuk.focus();
   }
 
+  // Padankan huruf besar/kecil dengan kategori sedia ada, cth "nota kuliah" -> "Nota Kuliah"
+  function kategoriBorang() {
+    const k = $('#borang').elements.kategori.value.trim().replace(/\s+/g, ' ');
+    const sedia = [...KATEGORI_ASAS, ...senaraiKategori()].find((x) => x.toLowerCase() === k.toLowerCase());
+    return sedia || k;
+  }
+
+  function kemasMedanKategori() {
+    const isTugasan = kategoriBorang() === TUGASAN;
+    document.querySelectorAll('#borang .hanya-tugasan').forEach((n) => { n.hidden = !isTugasan; });
+  }
+
   function dataBorang() {
     const e = $('#borang').elements;
     const v = (k) => e[k].value.trim() || null;
+    const kategori = kategoriBorang();
+    const isTugasan = kategori === TUGASAN;
     return {
+      kategori,
       tajuk: e.tajuk.value.trim(),
       kod_kursus: v('kod_kursus')?.toUpperCase() || null,
       nama_kursus: v('nama_kursus'),
       semester: v('semester'),
       pensyarah: v('pensyarah'),
-      jenis: v('jenis'),
-      tarikh_hantar: v('tarikh_hantar'),
-      status: e.status.value,
-      markah: v('markah'),
+      jenis: isTugasan ? v('jenis') : null,
+      tarikh_hantar: isTugasan ? v('tarikh_hantar') : null,
+      status: isTugasan ? e.status.value : null,
+      markah: isTugasan ? v('markah') : null,
       nota: v('nota'),
       tag: [...new Set(e.tag.value.split(',').map((s) => s.trim().replace(/^#/, '')).filter(Boolean))],
     };
@@ -365,7 +427,7 @@
       if (error) throw error;
 
       $('#dialog-borang').close();
-      toast('Tugasan disimpan ✔');
+      toast('Disimpan ✔');
       await muat();
     } catch (e) {
       ralat.textContent = mesejRalat(e);
@@ -386,7 +448,7 @@
     }
     const { error } = await sb.from('tugasan').delete().eq('id', t.id);
     if (error) { toast(mesejRalat(error), true); return; }
-    toast('Tugasan dipadam');
+    toast('Dipadam');
     await muat();
   }
 
@@ -416,6 +478,7 @@
     });
 
     $('#btn-tambah').addEventListener('click', () => bukaBorang());
+    $('#borang').elements.kategori.addEventListener('input', kemasMedanKategori);
     $('#borang').addEventListener('submit', simpan);
     document.querySelectorAll('[data-tutup]').forEach((b) => b.addEventListener('click', () => $('#dialog-borang').close()));
 
