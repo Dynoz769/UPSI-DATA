@@ -1,0 +1,45 @@
+# Ujian automatik: setiap push dan pull request
+name: Ujian
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ujian-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ujian:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Pasang kebergantungan
+        run: npm ci
+
+      - name: Pasang Chromium untuk Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Pastikan Index.html dijana daripada src/
+        run: |
+          python3 apps-script/bina.py
+          git diff --exit-code apps-script/Index.html || { echo "::error::Index.html tidak sama dengan src/. Jalankan: python3 apps-script/bina.py"; exit 1; }
+
+      - name: Semak sintaks
+        run: |
+          node --check apps-script/src/app.js
+          cp apps-script/Code.gs "$RUNNER_TEMP/Code.js" && node --check "$RUNNER_TEMP/Code.js"
+
+      - name: Jalankan ujian
+        run: npm test

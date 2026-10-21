@@ -1,0 +1,16 @@
+{
+  "name": "upsi-data",
+  "private": true,
+  "description": "Storan fail peribadi di Google Drive (Google Apps Script)",
+  "type": "module",
+  "scripts": {
+    "bina": "python3 apps-script/bina.py",
+    "test": "node --test \"tests/*.test.mjs\""
+  },
+  "devDependencies": {
+    "playwright": "1.56.1"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "UPSI-DATA",
+  "short_name": "UPSI-DATA",
+  "description": "Storan fail peribadi di Google Drive",
+  "lang": "ms",
+  "start_url": "./",
+  "scope": "./",
+  "display": "browser",
+  "background_color": "#f4f5f8",
+  "theme_color": "#4f46e5",
+  "icons": [
+    { "src": "ikon/ikon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "ikon/ikon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "ikon/ikon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "ikon/ikon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

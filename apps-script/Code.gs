@@ -20,11 +20,15 @@ const NAMA_FOLDER_GAMBAR = '_gambar-profil';
 const MAKS_GAMBAR_PROFIL = 300 * 1024;   // gambar profil dikecilkan di browser, biasanya < 50KB
 const MAKS_GAMBAR_PENUH = 3 * 1024 * 1024; // had gambar penuh sebagai ganti thumbnail
 const MAKS_LATAR = 5 * 1024 * 1024;        // gambar latar (sehingga 3840px / 4K, dimampatkan di browser)
+const JENIS_FOLDER = 'application/vnd.google-apps.folder';
+const IKON_URL = 'https://dynoz769.github.io/UPSI-DATA/ikon/ikon-192.png';
 
 function doGet() {
-  return HtmlService.createHtmlOutputFromFile('Index')
+  const out = HtmlService.createHtmlOutputFromFile('Index')
     .setTitle('UPSI-DATA')
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
+  try { out.setFaviconUrl(IKON_URL); } catch (e) { /* ikon pilihan sahaja */ }
+  return out;
 }
 
 // ---------- Utiliti ----------
@@ -285,6 +289,12 @@ function padamProfil(id, pin) {
   }
 }
 
+// Semak token yang disimpan di browser masih sah (untuk "ingat profil" selepas refresh)
+function semakSesi(token) {
+  profil_(token);
+  return true;
+}
+
 // Folder profil untuk token sesi; ralat SESI_TAMAT buat website kembali ke skrin pilih profil
 function profil_(token) {
   const id = token ? cache_().get('t_' + token) : null;
@@ -352,6 +362,44 @@ function failDalam_(asas, id) {
   return f;
 }
 
+// ---------- Carian Drive ----------
+
+// Senaraikan item yang induknya salah satu daripada ids. syarat: tambahan kepada query Drive.
+function cariDrive_(ids, syarat, medan) {
+  const hasil = [];
+  for (let i = 0; i < ids.length; i += 40) {
+    const kump = ids.slice(i, i + 40);
+    const q = '(' + kump.map(function (id) { return "'" + id + "' in parents"; }).join(' or ') + ')' + (syarat ? ' and ' + syarat : '');
+    let halaman = '';
+    do {
+      const url = DRIVE_API + '?' + qs_({ q: q, pageSize: 1000, pageToken: halaman, fields: 'nextPageToken,files(' + medan + ')' });
+      const data = JSON.parse(api_('get', url).getContentText());
+      (data.files || []).forEach(function (f) {
+        f.indukDalam = (f.parents || []).filter(function (p) { return kump.indexOf(p) >= 0; })[0] || '';
+        hasil.push(f);
+      });
+      halaman = data.nextPageToken || '';
+    } while (halaman);
+  }
+  return hasil;
+}
+
+function meta_(id) {
+  return JSON.parse(api_('get', DRIVE_API + '/' + encodeURIComponent(id) + '?fields=id,name,mimeType,parents,trashed').getContentText());
+}
+
+// Sama seperti pastikanDalam_, tetapi guna Drive API supaya berfungsi untuk item dalam Sampah juga
+function semakMilik_(asas, id) {
+  const asasId = asas.getId();
+  const m = meta_(id);
+  const parents = m.parents || [];
+  if (parents.indexOf(asasId) >= 0) return m;
+  for (let i = 0; i < parents.length; i++) {
+    if ((meta_(parents[i]).parents || []).indexOf(asasId) >= 0) return m;
+  }
+  throw new Error('Akses ditolak.');
+}
+
 // ---------- Senarai ----------
 
 function senarai(token) {
@@ -365,41 +413,85 @@ function senarai(token) {
   }
 
   const ids = [asas.getId()].concat(folders.map(function (f) { return f.id; }));
-  const fail = [];
-  for (let i = 0; i < ids.length; i += 40) {
-    const kump = ids.slice(i, i + 40);
-    const q = '(' + kump.map(function (id) { return "'" + id + "' in parents"; }).join(' or ') + ')'
-      + " and trashed = false and mimeType != 'application/vnd.google-apps.folder'";
-    let halaman = '';
-    do {
-      const url = DRIVE_API + '?' + qs_({
-        q: q,
-        pageSize: 1000,
-        pageToken: halaman,
-        fields: 'nextPageToken,files(id,name,mimeType,size,createdTime,parents,thumbnailLink,properties)',
-      });
-      const data = JSON.parse(api_('get', url).getContentText());
-      (data.files || []).forEach(function (f) {
-        fail.push({
-          id: f.id,
-          nama: f.name,
-          jenis: f.mimeType || '',
-          saiz: Number(f.size || 0),
-          tarikh: f.createdTime,
-          folderId: (f.parents || []).filter(function (p) { return kump.indexOf(p) >= 0; })[0] || asas.getId(),
-          thumb: f.thumbnailLink || '',
-          oleh: (f.properties && f.properties.diuploadOleh) || '',
-        });
-      });
-      halaman = data.nextPageToken || '';
-    } while (halaman);
-  }
+  const fail = cariDrive_(ids, "trashed = false and mimeType != '" + JENIS_FOLDER + "'",
+    'id,name,mimeType,size,createdTime,parents,thumbnailLink,properties').map(function (f) {
+    return {
+      id: f.id,
+      nama: f.name,
+      jenis: f.mimeType || '',
+      saiz: Number(f.size || 0),
+      tarikh: f.createdTime,
+      folderId: f.indukDalam || asas.getId(),
+      thumb: f.thumbnailLink || '',
+      oleh: (f.properties && f.properties.diuploadOleh) || '',
+    };
+  });
 
   let guna = 0;
   let had = 0;
   try { guna = DriveApp.getStorageUsed(); had = DriveApp.getStorageLimit(); } catch (e) { /* tak semua akaun benarkan */ }
 
   return { akarId: asas.getId(), folders: folders, fail: fail, guna: guna, had: had };
+}
+
+// ---------- Sampah ----------
+
+// Item yang dipadam (secara terus) dalam profil ini. Fail dalam folder yang dipadam ikut folder itu.
+function senaraiSampah(token) {
+  const asas = profil_(token);
+  const asasId = asas.getId();
+  const subfolder = cariDrive_([asasId], "mimeType = '" + JENIS_FOLDER + "'", 'id,name');
+  const namaFolder = {};
+  subfolder.forEach(function (f) { namaFolder[f.id] = f.name; });
+  const ids = [asasId].concat(subfolder.map(function (f) { return f.id; }));
+  const semua = cariDrive_(ids, 'trashed = true', 'id,name,mimeType,size,modifiedTime,parents,thumbnailLink,explicitlyTrashed');
+  const bilDalam = {};
+  semua.forEach(function (f) { if (!f.explicitlyTrashed && f.indukDalam) bilDalam[f.indukDalam] = (bilDalam[f.indukDalam] || 0) + 1; });
+  return semua.filter(function (f) { return f.explicitlyTrashed; }).map(function (f) {
+    const folder = f.mimeType === JENIS_FOLDER;
+    return {
+      id: f.id,
+      nama: f.name,
+      jenis: f.mimeType || '',
+      folder: folder,
+      bil: folder ? (bilDalam[f.id] || 0) : 0,
+      saiz: Number(f.size || 0),
+      tarikh: f.modifiedTime,
+      lokasi: f.indukDalam && f.indukDalam !== asasId ? (namaFolder[f.indukDalam] || '') : '',
+      thumb: f.thumbnailLink || '',
+    };
+  });
+}
+
+// Pulihkan dari Sampah. Kalau folder asal fail masih dalam Sampah, fail dipindah ke Utama supaya kelihatan.
+function pulihkan(token, id) {
+  const asas = profil_(token);
+  const asasId = asas.getId();
+  const m = semakMilik_(asas, id);
+  api_('patch', DRIVE_API + '/' + encodeURIComponent(id) + '?fields=id', {
+    contentType: 'application/json', payload: JSON.stringify({ trashed: false }),
+  });
+  const induk = (m.parents || [])[0];
+  if (m.mimeType !== JENIS_FOLDER && induk && induk !== asasId && meta_(induk).trashed) {
+    api_('patch', DRIVE_API + '/' + encodeURIComponent(id) + '?' + qs_({ addParents: asasId, removeParents: induk, fields: 'id' }), {
+      contentType: 'application/json', payload: '{}',
+    });
+    return { keUtama: true };
+  }
+  return { keUtama: false };
+}
+
+// Padam kekal (tidak boleh dipulihkan). Hanya untuk item yang sudah dalam Sampah.
+function padamKekal(token, id) {
+  const m = semakMilik_(profil_(token), id);
+  if (!m.trashed) throw new Error('Hanya item dalam Sampah boleh dipadam kekal.');
+  api_('delete', DRIVE_API + '/' + encodeURIComponent(id));
+}
+
+function kosongkanSampah(token) {
+  const item = senaraiSampah(token);
+  item.forEach(function (f) { api_('delete', DRIVE_API + '/' + encodeURIComponent(f.id)); });
+  return item.length;
 }
 
 // ---------- Upload (resumable, dihantar dalam cebisan) ----------
