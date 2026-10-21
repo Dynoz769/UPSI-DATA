@@ -2,6 +2,7 @@
 
 Storan fail peribadi, macam Google Drive versi ringkas. Upload fail kerja atau fail peribadi, susun dalam folder, buka dan muat turun dari mana-mana.
 
+- **Profil macam Netflix** (versi Google Drive): tiada login. Pilih profil dulu, tambah atau padam profil, dan kunci profil dengan PIN 4 digit kalau nak.
 - **Upload senang**: tekan **⬆ Upload Fail**, atau seret fail ke mana-mana bahagian skrin. Banyak fail sekali gus.
 - **Folder**: buat folder sendiri (cth. Kerja, Peribadi). Tukar nama atau padam folder.
 - **Urus fail**: buka, muat turun, tukar nama, pindah ke folder lain, padam.
@@ -21,9 +22,24 @@ Ada dua versi:
 
 # Versi Google Drive (Apps Script)
 
-Fail disimpan dalam folder **`UPSI-DATA`** di My Drive akaun Google kau. Setiap subfolder di dalamnya ialah satu folder dalam website. Kau juga boleh buka folder tu terus dalam Google Drive.
+Fail disimpan dalam Google Drive akaun yang deploy script ni:
 
-Website ni berjalan sebagai **akaun kau sendiri** dan ditetapkan **"Only myself"**, jadi hanya kau yang boleh buka.
+```
+UPSI-DATA/
+  Adam/            ← satu folder untuk setiap profil
+    Kerja/         ← folder dalam profil
+      laporan.pdf
+  Sara/
+    ...
+```
+
+Bila website dibuka, skrin **"Siapa yang guna?"** keluar dan kau pilih profil. Setiap profil hanya nampak fail sendiri. Tekan **Tambah Profil** untuk buat profil baru (nama, ikon, warna, PIN pilihan), atau **Urus Profil** untuk padam profil.
+
+### 🔒 Keselamatan
+- Website ni **tiada login**. Sesiapa yang ada link website boleh buka skrin profil.
+- Profil **tanpa PIN** boleh dibuka sesiapa yang ada link. Untuk fail peribadi, **letak PIN**.
+- PIN disemak di server Google, bukan di browser, dan disimpan sebagai hash. Selepas 5 kali PIN salah, profil dikunci 5 minit.
+- Jangan kongsi link website dengan orang yang kau tak percaya.
 
 ## Cara setup (±5 minit)
 
@@ -34,18 +50,21 @@ Website ni berjalan sebagai **akaun kau sendiri** dan ditetapkan **"Only myself"
 5. Tekan 💾 **Save**.
 6. Tekan **Deploy → New deployment** → ikon ⚙️ → **Web app**, dan tetapkan:
    - **Execute as**: *Me*
-   - **Who has access**: *Only myself*
+   - **Who has access**: *Anyone* (supaya tiada login; profil dan PIN yang mengawal akses)
 7. Tekan **Deploy** → **Authorize access** → pilih akaun kau.
    Kalau keluar *"Google hasn't verified this app"*: tekan **Advanced → Go to UPSI-DATA (unsafe)** → **Allow**. Ini normal sebab app ni kau buat sendiri.
 8. Salin **Web app URL** (`https://script.google.com/macros/s/.../exec`) dan **bookmark**. Itulah website kau.
+9. Buka URL tu dan tekan **Tambah Profil** untuk buat profil pertama.
 
 ### Bila kod dikemas kini
 Tampal kod baru → **Save** → **Deploy → Manage deployments** → ✏️ → **Version: New version** → **Deploy**. URL kekal sama.
 
 ## Masalah biasa
-- **"Maaf, tidak dapat membuka fail pada masa ini"**: browser kau login lebih dari satu akaun Google. Buka URL dalam tetingkap Incognito dan login akaun tu sahaja, atau guna profil Chrome berasingan.
+- **"Maaf, tidak dapat membuka fail pada masa ini"**: buka URL dalam tetingkap Incognito.
+- **Pilihan "Anyone" tiada**, cuma ada *Anyone within MOE*: admin sekat akses awam. Pilih pilihan tu. Orang perlu login akaun MOE untuk buka, tapi profil tetap berfungsi.
+- **"Sesi tamat"**: sesi profil tamat selepas 6 jam. Pilih profil semula.
 - **Akses disekat / "app is blocked"**: admin akaun sekolah/organisasi mungkin sekat Apps Script. Cuba guna akaun Gmail peribadi.
-- **Upload lambat untuk fail besar**: fail dihantar dalam cebisan 8MB melalui Google. Fail ratusan MB boleh ambil beberapa minit.
+- **Upload/muat turun lambat untuk fail besar**: fail dihantar dalam cebisan melalui Google. Fail ratusan MB boleh ambil beberapa minit.
 
 ## ⚠️ Nota akaun MOE / DELIMa
 - Akaun ni milik KPM. Admin boleh akses fail, dan akaun mungkin **dipadam bila kau tamat sekolah**. Simpan salinan fail penting di tempat lain juga.

@@ -1,13 +1,21 @@
 /**
- * UPSI-DATA: storan fail peribadi dalam Google Drive (Google Apps Script)
+ * UPSI-DATA: storan fail dalam Google Drive dengan profil macam Netflix (Google Apps Script)
  *
- * Semua fail disimpan dalam folder "UPSI-DATA" di My Drive akaun yang deploy script ni.
- * Setiap subfolder di dalamnya dipaparkan sebagai satu folder dalam website.
+ * Struktur dalam My Drive akaun yang deploy:
+ *   UPSI-DATA/<profil>/<folder>/<fail>
+ *
+ * Web app di-deploy "Execute as: Me" + "Who has access: Anyone", jadi tiada login.
+ * Semua fungsi fail perlukan token sesi yang hanya diberi oleh masukProfil()
+ * (selepas PIN disemak, kalau profil ada PIN). Token hanya boleh akses folder profilnya.
  */
 
 const NAMA_AKAR = 'UPSI-DATA';
 const DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
 const UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3/files';
+const MAKS_PROFIL = 10;
+const MAKS_CUBA_PIN = 5;
+const KUNCI_SAAT = 300;        // kunci profil 5 minit selepas terlalu banyak PIN salah
+const SESI_SAAT = 6 * 60 * 60; // token sesi tamat selepas 6 jam
 
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('Index')
@@ -18,7 +26,7 @@ function doGet() {
 // ---------- Utiliti ----------
 
 function akar_() {
-  const props = PropertiesService.getUserProperties();
+  const props = PropertiesService.getScriptProperties();
   const id = props.getProperty('AKAR_ID');
   if (id) {
     try {
@@ -60,51 +68,159 @@ function namaBersih_(nama) {
   return nama.slice(0, 200);
 }
 
-// Pastikan fail/folder berada di dalam folder UPSI-DATA (terus, atau dalam subfolder satu peringkat)
-function pastikanDalam_(item) {
-  const akarId = akar_().getId();
+function hash_(teks) {
+  return Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, teks, Utilities.Charset.UTF_8));
+}
+
+function cache_() {
+  return CacheService.getScriptCache();
+}
+
+// ---------- Profil ----------
+
+function profilSemua_() {
+  return JSON.parse(PropertiesService.getScriptProperties().getProperty('PROFIL') || '[]');
+}
+
+function simpanProfil_(list) {
+  PropertiesService.getScriptProperties().setProperty('PROFIL', JSON.stringify(list));
+}
+
+function awam_(p) {
+  return { id: p.id, nama: p.nama, ikon: p.ikon, warna: p.warna, adaPin: !!p.pin };
+}
+
+function cariProfil_(id) {
+  const p = profilSemua_().filter(function (x) { return x.id === id; })[0];
+  if (!p) throw new Error('Profil tidak dijumpai.');
+  return p;
+}
+
+function folderProfilWujud_(p) {
+  try { return !DriveApp.getFolderById(p.id).isTrashed(); } catch (e) { return false; }
+}
+
+function semakPin_(p, pin) {
+  if (!p.pin) return;
+  const kunci = 'cuba_' + p.id;
+  const cuba = Number(cache_().get(kunci) || 0);
+  if (cuba >= MAKS_CUBA_PIN) throw new Error('Terlalu banyak cubaan PIN salah. Cuba lagi dalam 5 minit.');
+  if (hash_(p.salt + ':' + String(pin || '')) !== p.pin) {
+    cache_().put(kunci, String(cuba + 1), KUNCI_SAAT);
+    throw new Error('PIN salah.');
+  }
+  cache_().remove(kunci);
+}
+
+function senaraiProfil() {
+  akar_();
+  return profilSemua_().filter(folderProfilWujud_).map(awam_);
+}
+
+function tambahProfil(nama, ikon, warna, pin) {
+  nama = namaBersih_(nama).slice(0, 30);
+  pin = String(pin || '');
+  if (pin && !/^\d{4}$/.test(pin)) throw new Error('PIN mesti 4 digit nombor.');
+  ikon = String(ikon || '🙂').slice(0, 8);
+  warna = /^#[0-9a-f]{6}$/i.test(warna) ? warna : '#3b4fd8';
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const list = profilSemua_().filter(folderProfilWujud_);
+    if (list.length >= MAKS_PROFIL) throw new Error('Maksimum ' + MAKS_PROFIL + ' profil.');
+    if (list.some(function (p) { return p.nama.toLowerCase() === nama.toLowerCase(); })) throw new Error('Nama profil tu dah wujud.');
+    const folder = akar_().createFolder(nama);
+    const salt = Utilities.getUuid();
+    const p = { id: folder.getId(), nama: nama, ikon: ikon, warna: warna, salt: salt, pin: pin ? hash_(salt + ':' + pin) : '' };
+    list.push(p);
+    simpanProfil_(list);
+    return awam_(p);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function masukProfil(id, pin) {
+  const p = cariProfil_(id);
+  semakPin_(p, pin);
+  const token = Utilities.getUuid();
+  cache_().put('t_' + token, p.id, SESI_SAAT);
+  return token;
+}
+
+// Profil dipadam beserta semua failnya (masuk Sampah Google Drive, boleh dipulihkan 30 hari)
+function padamProfil(id, pin) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const p = cariProfil_(id);
+    semakPin_(p, pin);
+    try { DriveApp.getFolderById(p.id).setTrashed(true); } catch (e) { /* folder dah tiada */ }
+    simpanProfil_(profilSemua_().filter(function (x) { return x.id !== id; }));
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Folder profil untuk token sesi; ralat SESI_TAMAT buat website kembali ke skrin pilih profil
+function profil_(token) {
+  const id = token ? cache_().get('t_' + token) : null;
+  if (!id) throw new Error('SESI_TAMAT');
+  if (!profilSemua_().some(function (p) { return p.id === id; })) throw new Error('SESI_TAMAT');
+  return DriveApp.getFolderById(id);
+}
+
+// Pastikan fail/folder berada dalam folder profil (terus, atau dalam subfolder satu peringkat)
+function pastikanDalam_(item, asas) {
+  const asasId = asas.getId();
   const parents = item.getParents();
   while (parents.hasNext()) {
     const p = parents.next();
-    if (p.getId() === akarId) return;
+    if (p.getId() === asasId) return;
     const atas = p.getParents();
-    while (atas.hasNext()) if (atas.next().getId() === akarId) return;
+    while (atas.hasNext()) if (atas.next().getId() === asasId) return;
   }
-  throw new Error('Item ini bukan dalam folder ' + NAMA_AKAR + '.');
+  throw new Error('Akses ditolak.');
 }
 
-function folderDalamAkar_(folderId) {
-  const akar = akar_();
-  if (!folderId || folderId === akar.getId()) return akar;
+function folderDalam_(asas, folderId) {
+  if (!folderId || folderId === asas.getId()) return asas;
   const f = DriveApp.getFolderById(folderId);
-  pastikanDalam_(f);
+  pastikanDalam_(f, asas);
+  return f;
+}
+
+function failDalam_(asas, id) {
+  const f = DriveApp.getFileById(id);
+  pastikanDalam_(f, asas);
   return f;
 }
 
 // ---------- Senarai ----------
 
-function senarai() {
-  const akar = akar_();
+function senarai(token) {
+  const asas = profil_(token);
   const folders = [];
-  const it = akar.getFolders();
+  const it = asas.getFolders();
   while (it.hasNext()) {
     const f = it.next();
     folders.push({ id: f.getId(), nama: f.getName() });
   }
 
-  const ids = [akar.getId()].concat(folders.map(function (f) { return f.id; }));
+  const ids = [asas.getId()].concat(folders.map(function (f) { return f.id; }));
   const fail = [];
   for (let i = 0; i < ids.length; i += 40) {
     const kump = ids.slice(i, i + 40);
     const q = '(' + kump.map(function (id) { return "'" + id + "' in parents"; }).join(' or ') + ')'
       + " and trashed = false and mimeType != 'application/vnd.google-apps.folder'";
-    let token = '';
+    let halaman = '';
     do {
       const url = DRIVE_API + '?' + qs_({
         q: q,
         pageSize: 1000,
-        pageToken: token,
-        fields: 'nextPageToken,files(id,name,mimeType,size,createdTime,parents,thumbnailLink,webViewLink)',
+        pageToken: halaman,
+        fields: 'nextPageToken,files(id,name,mimeType,size,createdTime,parents,thumbnailLink)',
       });
       const data = JSON.parse(api_('get', url).getContentText());
       (data.files || []).forEach(function (f) {
@@ -114,34 +230,26 @@ function senarai() {
           jenis: f.mimeType || '',
           saiz: Number(f.size || 0),
           tarikh: f.createdTime,
-          folderId: (f.parents || []).filter(function (p) { return kump.indexOf(p) >= 0; })[0] || akar.getId(),
+          folderId: (f.parents || []).filter(function (p) { return kump.indexOf(p) >= 0; })[0] || asas.getId(),
           thumb: f.thumbnailLink || '',
-          url: f.webViewLink || '',
         });
       });
-      token = data.nextPageToken || '';
-    } while (token);
+      halaman = data.nextPageToken || '';
+    } while (halaman);
   }
 
   let guna = 0;
   let had = 0;
   try { guna = DriveApp.getStorageUsed(); had = DriveApp.getStorageLimit(); } catch (e) { /* tak semua akaun benarkan */ }
 
-  return {
-    akarId: akar.getId(),
-    akarUrl: akar.getUrl(),
-    emel: Session.getActiveUser().getEmail(),
-    folders: folders,
-    fail: fail,
-    guna: guna,
-    had: had,
-  };
+  return { akarId: asas.getId(), folders: folders, fail: fail, guna: guna, had: had };
 }
 
 // ---------- Upload (resumable, dihantar dalam cebisan) ----------
 
-function mulaUpload(folderId, nama, jenis, saiz) {
-  const folder = folderDalamAkar_(folderId);
+function mulaUpload(token, folderId, nama, jenis, saiz) {
+  const asas = profil_(token);
+  const folder = folderDalam_(asas, folderId);
   const res = api_('post', UPLOAD_API + '?uploadType=resumable&fields=id', {
     contentType: 'application/json; charset=UTF-8',
     headers: {
@@ -153,11 +261,13 @@ function mulaUpload(folderId, nama, jenis, saiz) {
   const h = res.getAllHeaders();
   const sesi = h.Location || h.location;
   if (!sesi) throw new Error('Google Drive tidak memberi URL upload.');
+  cache_().put('up_' + hash_(sesi), asas.getId(), SESI_SAAT);
   return sesi;
 }
 
-function hantarCebisan(sesi, b64, mula, jumlah) {
-  if (!/^https:\/\/www\.googleapis\.com\/upload\/drive\//.test(sesi)) throw new Error('URL upload tidak sah.');
+function hantarCebisan(token, sesi, b64, mula, jumlah) {
+  const asas = profil_(token);
+  if (cache_().get('up_' + hash_(sesi)) !== asas.getId()) throw new Error('Sesi upload tidak sah.');
   const bytes = b64 ? Utilities.base64Decode(b64) : [];
   const julat = jumlah === 0 ? 'bytes */0' : 'bytes ' + mula + '-' + (mula + bytes.length - 1) + '/' + jumlah;
   const res = UrlFetchApp.fetch(sesi, {
@@ -173,44 +283,58 @@ function hantarCebisan(sesi, b64, mula, jumlah) {
   throw new Error('Upload gagal (' + kod + '): ' + res.getContentText().slice(0, 300));
 }
 
-// ---------- Fail ----------
+// ---------- Muat turun (dihantar dalam cebisan sebab fail tidak dikongsi secara awam) ----------
 
-function tukarNamaFail(id, nama) {
-  const f = DriveApp.getFileById(id);
-  pastikanDalam_(f);
-  f.setName(namaBersih_(nama));
+function bacaCebisan(token, id, mula, panjang) {
+  const asas = profil_(token);
+  failDalam_(asas, id);
+  const res = api_('get', DRIVE_API + '/' + encodeURIComponent(id) + '?alt=media', {
+    headers: { Range: 'bytes=' + mula + '-' + (mula + panjang - 1) },
+  });
+  return Utilities.base64Encode(res.getContent());
 }
 
-function pindahFail(id, folderId) {
-  const f = DriveApp.getFileById(id);
-  pastikanDalam_(f);
-  f.moveTo(folderDalamAkar_(folderId));
+// Google Docs/Sheets/Slides asli dieksport sebagai PDF (had Google: 10MB)
+function eksportPdf(token, id) {
+  const asas = profil_(token);
+  const f = failDalam_(asas, id);
+  const res = api_('get', DRIVE_API + '/' + encodeURIComponent(id) + '/export?mimeType=application%2Fpdf');
+  return { b64: Utilities.base64Encode(res.getContent()), nama: f.getName() + '.pdf' };
+}
+
+// ---------- Fail ----------
+
+function tukarNamaFail(token, id, nama) {
+  failDalam_(profil_(token), id).setName(namaBersih_(nama));
+}
+
+function pindahFail(token, id, folderId) {
+  const asas = profil_(token);
+  failDalam_(asas, id).moveTo(folderDalam_(asas, folderId));
 }
 
 // Fail dipadam masuk ke Sampah Google Drive (boleh dipulihkan dalam 30 hari)
-function padamFail(id) {
-  const f = DriveApp.getFileById(id);
-  pastikanDalam_(f);
-  f.setTrashed(true);
+function padamFail(token, id) {
+  failDalam_(profil_(token), id).setTrashed(true);
 }
 
 // ---------- Folder ----------
 
-function folderBaru(nama) {
+function folderBaru(token, nama) {
   nama = namaBersih_(nama);
-  const akar = akar_();
-  const ada = akar.getFoldersByName(nama);
-  return (ada.hasNext() ? ada.next() : akar.createFolder(nama)).getId();
+  const asas = profil_(token);
+  const ada = asas.getFoldersByName(nama);
+  return (ada.hasNext() ? ada.next() : asas.createFolder(nama)).getId();
 }
 
-function tukarNamaFolder(id, nama) {
-  const f = folderDalamAkar_(id);
-  if (f.getId() === akar_().getId()) throw new Error('Folder utama tidak boleh ditukar nama.');
-  f.setName(namaBersih_(nama));
+function tukarNamaFolder(token, id, nama) {
+  const asas = profil_(token);
+  if (id === asas.getId()) throw new Error('Folder utama tidak boleh ditukar nama.');
+  folderDalam_(asas, id).setName(namaBersih_(nama));
 }
 
-function padamFolder(id) {
-  const f = folderDalamAkar_(id);
-  if (f.getId() === akar_().getId()) throw new Error('Folder utama tidak boleh dipadam.');
-  f.setTrashed(true);
+function padamFolder(token, id) {
+  const asas = profil_(token);
+  if (id === asas.getId()) throw new Error('Folder utama tidak boleh dipadam.');
+  folderDalam_(asas, id).setTrashed(true);
 }
