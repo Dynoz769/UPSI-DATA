@@ -17,7 +17,7 @@ Ada dua versi:
 | Folder | `apps-script/` | `public/lama/`, `supabase/` |
 | Ruang | Ikut kuota Google Drive akaun kau | 1 GB percuma |
 | Saiz fail | Tiada had praktikal (dihantar dalam cebisan 8MB) | 50 MB |
-| Alamat | [Web app MOE](https://script.google.com/a/macros/moe-dl.edu.my/s/AKfycbxoYc8-PWiF9fhsElI5qLJ5NndhSPgtyp1f2TGRiLpMPJVGiQDoxVTStflm_3x15O_eRw/exec) (juga `dynoz769.github.io/UPSI-DATA`, yang terus bawa ke sini) | `dynoz769.github.io/UPSI-DATA/lama/` |
+| Alamat | [Web app](https://script.google.com/macros/s/AKfycbwyjEeiiLCLWmnDWMh_CVKp81ZiwsTlP8GgzsFzNrTnFCP6WkCdL9aIVKnlOl-ShXzW1g/exec) (juga `dynoz769.github.io/UPSI-DATA`, yang terus bawa ke sini) | `dynoz769.github.io/UPSI-DATA/lama/` |
 
 ---
 
