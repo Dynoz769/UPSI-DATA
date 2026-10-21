@@ -1,0 +1,1097 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8">
+  <base target="_top">
+  <style>
+:root {
+  --bg: #f5f6fa;
+  --surface: #ffffff;
+  --surface-2: #eef0f6;
+  --text: #1c1f2a;
+  --muted: #6b7183;
+  --border: #dde0ea;
+  --primary: #3b4fd8;
+  --primary-text: #ffffff;
+  --danger: #c62e3d;
+  --warn: #b86a00;
+  --ok: #1d8a4e;
+  --shadow: 0 1px 2px rgba(20, 24, 40, .06), 0 4px 14px rgba(20, 24, 40, .05);
+  --radius: 12px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111318;
+    --surface: #1a1d25;
+    --surface-2: #242834;
+    --text: #e8eaf1;
+    --muted: #9298ab;
+    --border: #2e3342;
+    --primary: #7083ff;
+    --primary-text: #0d1020;
+    --danger: #ff6b78;
+    --warn: #f0a640;
+    --ok: #4cc983;
+    --shadow: none;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+[hidden] { display: none !important; }
+
+code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; font-size: .9em; }
+
+.pudar { color: var(--muted); }
+.kecil { font-size: .82em; }
+.ralat { color: var(--danger); margin: 8px 0 0; font-size: .92em; }
+
+/* Butang */
+.btn {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  padding: 8px 14px;
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover { background: var(--surface-2); }
+.btn:disabled { opacity: .6; cursor: wait; }
+.btn.utama { background: var(--primary); border-color: var(--primary); color: var(--primary-text); font-weight: 600; }
+.btn.utama:hover { filter: brightness(1.08); }
+.btn.penuh { width: 100%; margin-top: 8px; }
+.btn.ikon { padding: 4px 8px; border-color: transparent; background: transparent; }
+.btn.ikon:hover { background: var(--surface-2); }
+
+input, select, textarea {
+  width: 100%;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
+textarea { resize: vertical; }
+
+label { display: block; font-size: .88em; color: var(--muted); }
+label > input, label > select, label > textarea { margin-top: 4px; font-size: 1rem; }
+
+/* Header */
+.atas {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.jenama { font-weight: 700; font-size: 1.1rem; }
+.pengguna { display: flex; align-items: center; gap: 10px; min-width: 0; }
+#emel-pengguna { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .9em; }
+
+.isi { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
+
+/* Ruang storan */
+.ruang { margin-bottom: 16px; }
+.ruang-teks { font-size: .9em; margin-bottom: 6px; }
+#ruang-guna { font-weight: 600; }
+.ruang-bar { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+#ruang-isi { height: 100%; width: 0; background: var(--primary); border-radius: 999px; transition: width .3s; }
+#ruang-isi.penuh { background: var(--danger); }
+
+/* Tab folder */
+.tab-baris {
+  display: flex; gap: 6px; margin-bottom: 14px; padding-bottom: 2px;
+  overflow-x: auto; scrollbar-width: thin;
+}
+.tab {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  padding: 6px 12px; border-radius: 999px; font: inherit; font-size: .9em; cursor: pointer;
+}
+.tab:hover { background: var(--surface-2); }
+.tab.aktif { background: var(--primary); border-color: var(--primary); color: var(--primary-text); font-weight: 600; }
+.tab.tab-baru { border-style: dashed; color: var(--muted); }
+.tab-bil {
+  font-size: .8em; padding: 0 6px; border-radius: 999px;
+  background: var(--surface-2); color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.tab.aktif .tab-bil { background: color-mix(in srgb, var(--primary-text) 22%, transparent); color: inherit; }
+
+/* Alat */
+.alat { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.alat #cari { flex: 1 1 240px; }
+.alat select { flex: 0 1 160px; width: auto; }
+
+.tajuk-folder { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.tajuk-folder h2 { margin: 0 auto 0 0; font-size: 1.15rem; overflow-wrap: anywhere; }
+.btn.kecil { padding: 5px 10px; font-size: .85em; }
+.btn.bahaya { color: var(--danger); }
+
+/* Grid fail */
+.senarai { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.kad {
+  display: flex; flex-direction: column; min-width: 0; overflow: hidden;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.kad-pratonton {
+  display: grid; place-items: center; aspect-ratio: 4 / 3; padding: 0; border: none;
+  background: var(--surface-2); cursor: pointer; overflow: hidden;
+}
+.kad-pratonton img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.kad-ikon { font-size: 2.6rem; }
+.kad-badan { padding: 10px 12px 8px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.kad-nama {
+  border: none; background: none; padding: 0; font: inherit; font-weight: 600; font-size: .92em;
+  color: var(--text); text-align: left; cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.kad-nama:hover { color: var(--primary); text-decoration: underline; }
+.kad-meta { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: .78em; }
+.kad-meta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.kad-aksi { display: flex; justify-content: space-between; margin: 2px -6px 0; }
+
+.fail-senarai { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 4px; max-height: 40vh; overflow-y: auto; }
+.fail-senarai li {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface-2); border-radius: 8px; padding: 4px 6px 4px 10px; min-width: 0;
+}
+.fail-nama { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .9em; }
+
+.kosong { text-align: center; color: var(--text); padding: 50px 16px; }
+.kosong p { margin: 4px 0; }
+.kosong-ikon { font-size: 3rem; margin-bottom: 6px; }
+
+/* Lapisan seret & lepas */
+.lapisan-seret {
+  position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; pointer-events: none;
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+  border: 3px dashed var(--primary);
+}
+.lapisan-seret div {
+  background: var(--surface); color: var(--text); padding: 14px 22px; border-radius: var(--radius);
+  font-weight: 600; box-shadow: var(--shadow);
+}
+
+/* Dialog */
+dialog {
+  width: min(520px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  padding: 0; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); color: var(--text);
+}
+dialog::backdrop { background: rgba(10, 12, 20, .5); }
+dialog form { padding: 18px 20px; }
+.dialog-kepala { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.dialog-kepala h2 { margin: 0; font-size: 1.2rem; }
+.zon-lepas {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  margin-top: 8px; padding: 12px; text-align: center; cursor: pointer;
+  border: 2px dashed var(--border); border-radius: var(--radius); color: var(--text);
+}
+.zon-lepas:hover, .zon-lepas.aktif { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 6%, transparent); }
+.dialog-kaki { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+/* Toast */
+.toast {
+  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 50;
+  background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .2); max-width: calc(100vw - 32px);
+}
+.toast.ralat { background: var(--danger); color: #fff; }
+
+@media (max-width: 720px) {
+  .senarai { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .alat select { flex: 1 1 calc(50% - 4px); }
+  .alat .btn.utama { flex: 1 1 calc(50% - 4px); }
+  #emel-pengguna { display: none; }
+}
+
+/* Pautan yang digayakan sebagai butang/kad */
+a.btn { display: inline-flex; align-items: center; text-decoration: none; }
+
+/* Skrin pilih profil */
+.skrin-profil {
+  min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 32px 16px; text-align: center;
+}
+.jenama-besar { font-weight: 700; font-size: 1.1rem; color: var(--muted); margin-bottom: 18px; }
+.skrin-profil h1 { margin: 0 0 28px; font-size: clamp(1.4rem, 4vw, 2.2rem); font-weight: 600; }
+.grid-profil { display: flex; flex-wrap: wrap; justify-content: center; gap: 22px; max-width: 760px; }
+.kad-profil {
+  display: flex; flex-direction: column; align-items: center; gap: 10px; width: 120px;
+  border: none; background: none; padding: 0; font: inherit; color: var(--muted); cursor: pointer;
+}
+.kad-profil:hover, .kad-profil:focus-visible { color: var(--text); }
+.kad-profil:hover .avatar, .kad-profil:focus-visible .avatar { outline: 3px solid var(--text); outline-offset: 2px; }
+.kad-profil:focus-visible { outline: none; }
+.avatar {
+  display: inline-grid; place-items: center; width: 110px; height: 110px; border-radius: 10px;
+  font-size: 3.4rem; line-height: 1; color: #fff; user-select: none;
+}
+.avatar-tambah { background: var(--surface-2); color: var(--muted); font-size: 3rem; border: 2px dashed var(--border); }
+.avatar-bungkus { position: relative; display: inline-block; }
+.avatar-padam {
+  position: absolute; inset: 0; display: grid; place-items: center; border-radius: 10px;
+  background: rgba(0, 0, 0, .55); font-size: 2rem;
+}
+.kad-profil.urus .avatar { opacity: .8; }
+.nama-profil { font-size: .95rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kunci { font-size: .85em; }
+.btn-urus { margin-top: 36px; padding: 8px 22px; letter-spacing: .04em; }
+
+/* Profil dalam header */
+.profil-kecil {
+  display: inline-flex; align-items: center; gap: 8px; min-width: 0;
+  border: 1px solid transparent; background: none; color: var(--text); font: inherit;
+  padding: 4px 8px 4px 4px; border-radius: 10px; cursor: pointer;
+}
+.profil-kecil:hover { background: var(--surface-2); border-color: var(--border); }
+#nama-profil-kecil { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40vw; font-weight: 600; }
+.avatar.avatar-kecil { width: 32px; height: 32px; border-radius: 6px; font-size: 1.1rem; }
+
+/* Dialog tambah profil */
+.profil-pratonton { display: flex; justify-content: center; margin-bottom: 12px; }
+.profil-pratonton .avatar { width: 84px; height: 84px; font-size: 2.6rem; }
+.label-kecil { font-size: .88em; color: var(--muted); margin: 12px 0 6px; }
+.pilih-ikon, .pilih-warna { display: flex; flex-wrap: wrap; gap: 6px; }
+.pilihan {
+  width: 38px; height: 38px; border-radius: 8px; border: 2px solid var(--border);
+  background: var(--surface); font-size: 1.2rem; cursor: pointer; padding: 0;
+}
+.pilihan.aktif { border-color: var(--text); box-shadow: 0 0 0 2px var(--surface) inset; }
+.pilihan.warna { border-color: transparent; }
+.pilihan.warna.aktif { border-color: var(--text); }
+#borang-profil label { margin-top: 12px; }
+.input-pin { font-size: 1.6rem; letter-spacing: .6em; text-align: center; padding: 10px; }
+
+@media (max-width: 480px) {
+  .grid-profil { gap: 16px; }
+  .kad-profil { width: 96px; }
+  .avatar { width: 92px; height: 92px; font-size: 2.8rem; }
+}
+  </style>
+</head>
+<body>
+  <!-- Skrin: pilih profil -->
+  <section id="skrin-profil" class="skrin skrin-profil">
+    <div class="jenama-besar">📁 UPSI-DATA</div>
+    <h1 id="tajuk-profil">Siapa yang guna?</h1>
+    <div id="grid-profil" class="grid-profil"><p class="pudar">Memuatkan…</p></div>
+    <button id="btn-urus-profil" class="btn btn-urus" hidden>Urus Profil</button>
+  </section>
+
+  <!-- Skrin: fail -->
+  <section id="skrin-utama" class="skrin" hidden>
+  <header class="atas">
+    <div class="jenama">📁 UPSI-DATA</div>
+    <button id="btn-tukar-profil" class="profil-kecil" title="Tukar profil">
+      <span id="avatar-kecil" class="avatar avatar-kecil"></span>
+      <span id="nama-profil-kecil"></span>
+      <span class="pudar kecil">▾</span>
+    </button>
+  </header>
+
+  <main class="isi">
+    <div class="ruang">
+      <div class="ruang-teks"><span id="ruang-guna"></span><span class="pudar" id="ruang-had"></span></div>
+      <div class="ruang-bar"><div id="ruang-isi"></div></div>
+    </div>
+
+    <nav id="tab-folder" class="tab-baris" aria-label="Folder"></nav>
+
+    <div class="alat">
+      <input id="cari" type="search" placeholder="Cari nama fail…">
+      <select id="susun" aria-label="Susun">
+        <option value="baru">Terbaru</option>
+        <option value="nama">Nama A–Z</option>
+        <option value="saiz">Saiz terbesar</option>
+      </select>
+      <button id="btn-upload" class="btn utama">⬆ Upload Fail</button>
+      <input id="input-fail" type="file" multiple hidden>
+    </div>
+
+    <div id="tajuk-folder" class="tajuk-folder" hidden>
+      <h2 id="nama-folder"></h2>
+      <button id="btn-nama-folder" class="btn kecil">✏️ Tukar nama</button>
+      <button id="btn-padam-folder" class="btn kecil bahaya">🗑️ Padam folder</button>
+    </div>
+
+    <div id="senarai" class="senarai"></div>
+    <div id="kosong" class="kosong"></div>
+  </main>
+  </section>
+
+  <div id="lapisan-seret" class="lapisan-seret" hidden><div>Lepaskan untuk upload</div></div>
+
+  <!-- Dialog upload -->
+  <dialog id="dialog-upload">
+    <form id="borang-upload" method="dialog">
+      <div class="dialog-kepala">
+        <h2>Upload Fail</h2>
+        <button type="button" class="btn ikon" data-tutup aria-label="Tutup">✕</button>
+      </div>
+      <label>Simpan dalam folder
+        <input name="folder" list="senarai-folder" required placeholder="cth: Kerja">
+      </label>
+      <ul id="senarai-upload" class="fail-senarai"></ul>
+      <label class="zon-lepas">
+        <input id="input-fail-tambah" type="file" multiple hidden>
+        <span>+ Tambah fail lagi</span>
+      </label>
+      <p id="ralat-upload" class="ralat" hidden></p>
+      <div class="dialog-kaki">
+        <button type="button" class="btn" data-tutup>Batal</button>
+        <button type="submit" id="btn-mula-upload" class="btn utama">Upload</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Dialog teks ringkas: folder baru / tukar nama / pindah -->
+  <dialog id="dialog-teks">
+    <form id="borang-teks" method="dialog">
+      <div class="dialog-kepala">
+        <h2 id="teks-tajuk"></h2>
+        <button type="button" class="btn ikon" data-tutup aria-label="Tutup">✕</button>
+      </div>
+      <label><span id="teks-label"></span>
+        <input name="nilai" required autocomplete="off">
+      </label>
+      <p id="ralat-teks" class="ralat" hidden></p>
+      <div class="dialog-kaki">
+        <button type="button" class="btn" data-tutup>Batal</button>
+        <button type="submit" id="btn-teks-ok" class="btn utama">OK</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Dialog tambah profil -->
+  <dialog id="dialog-profil">
+    <form id="borang-profil" method="dialog">
+      <div class="dialog-kepala">
+        <h2>Tambah Profil</h2>
+        <button type="button" class="btn ikon" data-tutup aria-label="Tutup">✕</button>
+      </div>
+      <div class="profil-pratonton"><span id="avatar-pratonton" class="avatar"></span></div>
+      <label>Nama
+        <input name="nama" required maxlength="30" autocomplete="off" placeholder="cth: Adam">
+      </label>
+      <div class="label-kecil">Ikon</div>
+      <div id="pilih-ikon" class="pilih-ikon"></div>
+      <div class="label-kecil">Warna</div>
+      <div id="pilih-warna" class="pilih-warna"></div>
+      <label>PIN 4 digit (pilihan)
+        <input name="pin" inputmode="numeric" pattern="\d{4}" maxlength="4" autocomplete="off" placeholder="Kosongkan kalau tak nak kunci">
+      </label>
+      <p class="pudar kecil">Profil tanpa PIN boleh dibuka sesiapa yang ada link website ni.</p>
+      <p id="ralat-profil" class="ralat" hidden></p>
+      <div class="dialog-kaki">
+        <button type="button" class="btn" data-tutup>Batal</button>
+        <button type="submit" id="btn-simpan-profil" class="btn utama">Tambah</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Dialog PIN -->
+  <dialog id="dialog-pin">
+    <form id="borang-pin" method="dialog">
+      <div class="dialog-kepala">
+        <h2 id="pin-tajuk">Masukkan PIN</h2>
+        <button type="button" class="btn ikon" data-tutup aria-label="Tutup">✕</button>
+      </div>
+      <p id="pin-teks" class="pudar"></p>
+      <input name="pin" class="input-pin" type="password" inputmode="numeric" pattern="\d{4}" maxlength="4" required autocomplete="off" aria-label="PIN">
+      <p id="ralat-pin" class="ralat" hidden></p>
+      <div class="dialog-kaki">
+        <button type="button" class="btn" data-tutup>Batal</button>
+        <button type="submit" id="btn-pin-ok" class="btn utama">OK</button>
+      </div>
+    </form>
+  </dialog>
+
+  <datalist id="senarai-folder"></datalist>
+  <div id="toast" class="toast" hidden></div>
+
+  <script>
+(() => {
+  'use strict';
+
+  const CEBISAN_UP = 8 * 1024 * 1024;   // saiz cebisan upload (gandaan 256KB)
+  const CEBISAN_TURUN = 4 * 1024 * 1024; // saiz cebisan muat turun
+  const FOLDER_CADANGAN = ['Kerja', 'Peribadi', 'Dokumen', 'Gambar', 'Sijil', 'Nota'];
+  const IKON_PROFIL = ['🙂', '😎', '🤓', '🦊', '🐱', '🐼', '🐯', '🦁', '🐸', '🐧', '🌸', '⭐', '🚀', '🎮', '📚', '💼'];
+  const WARNA_PROFIL = ['#e50914', '#3b4fd8', '#1d8a4e', '#d97706', '#9333ea', '#0891b2', '#db2777', '#475569'];
+
+  const $ = (s, el = document) => el.querySelector(s);
+
+  let token = '';
+  let profilAktif = null;  // { id, nama, ikon, warna, adaPin }
+  let profilList = [];
+  let modUrus = false;
+  let akarId = '';
+  let folders = [];        // { id, nama }
+  let semua = [];          // { id, nama, jenis, saiz, tarikh, folderId, thumb }
+  let folderAktif = '';    // id folder; '' = Semua
+  let failUpload = [];
+
+  // Panggil fungsi dalam Code.gs
+  const panggilTerus = (fn, ...args) => new Promise((ok, gagal) => {
+    google.script.run.withSuccessHandler(ok).withFailureHandler(gagal)[fn](...args);
+  });
+
+  // Panggil fungsi fail dengan token; kalau sesi tamat, kembali ke skrin pilih profil
+  const panggil = async (fn, ...args) => {
+    try {
+      return await panggilTerus(fn, token, ...args);
+    } catch (e) {
+      if (/SESI_TAMAT/.test(e && e.message)) {
+        keluarProfil();
+        toast('Sesi tamat. Pilih profil semula.', true);
+      }
+      throw e;
+    }
+  };
+
+  // ---------- Utiliti ----------
+  const el = (tag, attrs = {}, ...anak) => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === 'class') n.className = v;
+      else if (k === 'style') n.style.cssText = v;
+      else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+      else if (v !== false && v != null) n.setAttribute(k, v === true ? '' : v);
+    }
+    for (const a of anak.flat()) if (a != null && a !== false) n.append(a);
+    return n;
+  };
+
+  // replaceChildren tanpa nilai kosong/false (untuk anak bersyarat)
+  const isi = (node, ...anak) => node.replaceChildren(...anak.flat().filter((a) => a != null && a !== false));
+
+  const tunjuk = (id) => {
+    document.querySelectorAll('.skrin').forEach((s) => { s.hidden = s.id !== id; });
+  };
+
+  const saiz = (b) => {
+    if (b == null) return '';
+    const u = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let i = 0;
+    while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
+    return `${b.toFixed(i ? 1 : 0)} ${u[i]}`;
+  };
+
+  const tarikh = (d) => d
+    ? new Date(d).toLocaleDateString('ms-MY', { day: 'numeric', month: 'short', year: 'numeric' })
+    : '';
+
+  const sambungan = (nama) => (nama.includes('.') ? nama.split('.').pop().toLowerCase() : '');
+  const isGoogleDoc = (f) => f.jenis.startsWith('application/vnd.google-apps.');
+
+  const ikonFail = (f) => {
+    const ext = sambungan(f.nama);
+    const j = f.jenis;
+    if (j.startsWith('image/')) return '🖼️';
+    if (ext === 'pdf' || j === 'application/pdf') return '📕';
+    if (j.endsWith('google-apps.document') || ['doc', 'docx', 'odt', 'rtf', 'txt', 'md'].includes(ext)) return '📝';
+    if (j.endsWith('google-apps.presentation') || ['ppt', 'pptx', 'key', 'odp'].includes(ext)) return '📊';
+    if (j.endsWith('google-apps.spreadsheet') || ['xls', 'xlsx', 'csv', 'ods'].includes(ext)) return '📈';
+    if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return '🗜️';
+    if (j.startsWith('video/')) return '🎬';
+    if (j.startsWith('audio/')) return '🎵';
+    return '📄';
+  };
+
+  const avatar = (p, kelas = '') => el('span', { class: `avatar ${kelas}`, style: `background:${p.warna}` }, p.ikon);
+
+  const namaFolder = (id) => (id === akarId ? 'Utama' : (folders.find((f) => f.id === id)?.nama || '?'));
+
+  let toastTimer;
+  const toast = (msg, ralat = false, kekal = false) => {
+    const t = $('#toast');
+    t.textContent = msg;
+    t.classList.toggle('ralat', ralat);
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    if (!kekal) toastTimer = setTimeout(() => { t.hidden = true; }, 4000);
+  };
+
+  const mesejRalat = (e) => {
+    const m = (e && e.message) || String(e);
+    if (/SESI_TAMAT/.test(m)) return 'Sesi tamat. Pilih profil semula.';
+    if (/NetworkError|network/i.test(m)) return 'Sambungan internet terputus. Cuba lagi.';
+    return m.replace(/^Exception:\s*/, '');
+  };
+
+  // ---------- Profil ----------
+  async function muatProfil() {
+    try {
+      profilList = await panggilTerus('senaraiProfil');
+    } catch (e) {
+      $('#grid-profil').replaceChildren(el('p', { class: 'ralat' }, mesejRalat(e)));
+      return;
+    }
+    if (!profilList.length) modUrus = false;
+    paparProfil();
+  }
+
+  function paparProfil() {
+    $('#tajuk-profil').textContent = modUrus ? 'Urus Profil' : (profilList.length ? 'Siapa yang guna?' : 'Selamat datang! Buat profil pertama kau.');
+    const btnUrus = $('#btn-urus-profil');
+    btnUrus.hidden = !profilList.length;
+    btnUrus.textContent = modUrus ? 'Siap' : 'Urus Profil';
+    btnUrus.classList.toggle('utama', modUrus);
+
+    isi($('#grid-profil'),
+      ...profilList.map((p) => el('button', {
+        class: `kad-profil ${modUrus ? 'urus' : ''}`,
+        onclick: () => (modUrus ? padamProfil(p) : masukProfil(p)),
+        'aria-label': modUrus ? `Padam profil ${p.nama}` : `Masuk sebagai ${p.nama}`,
+      },
+        el('span', { class: 'avatar-bungkus' }, avatar(p), modUrus && el('span', { class: 'avatar-padam' }, '🗑️')),
+        el('span', { class: 'nama-profil' }, p.nama, p.adaPin && el('span', { class: 'kunci', title: 'Dikunci dengan PIN' }, ' 🔒')),
+      )),
+      !modUrus && profilList.length < 10 && el('button', { class: 'kad-profil', onclick: bukaTambahProfil },
+        el('span', { class: 'avatar avatar-tambah' }, '+'),
+        el('span', { class: 'nama-profil' }, 'Tambah Profil'),
+      ),
+    );
+  }
+
+  async function masukProfil(p) {
+    try {
+      token = p.adaPin
+        ? await mintaPin(`Masukkan PIN untuk ${p.nama}`, (pin) => panggilTerus('masukProfil', p.id, pin))
+        : await panggilTerus('masukProfil', p.id, '');
+    } catch (e) {
+      if (e !== 'batal') toast(mesejRalat(e), true);
+      return;
+    }
+    profilAktif = p;
+    folderAktif = '';
+    semua = [];
+    folders = [];
+    $('#avatar-kecil').replaceWith(Object.assign(avatar(p, 'avatar-kecil'), { id: 'avatar-kecil' }));
+    $('#nama-profil-kecil').textContent = p.nama;
+    $('#senarai').replaceChildren();
+    $('#kosong').hidden = false;
+    $('#kosong').replaceChildren(el('div', { class: 'kosong-ikon' }, '⏳'), el('p', {}, 'Memuatkan fail…'));
+    tunjuk('skrin-utama');
+    await muat();
+  }
+
+  function keluarProfil() {
+    token = '';
+    profilAktif = null;
+    document.querySelectorAll('dialog[open]').forEach((d) => d.close());
+    tunjuk('skrin-profil');
+    muatProfil();
+  }
+
+  async function padamProfil(p) {
+    if (!confirm(`Padam profil "${p.nama}" beserta SEMUA failnya?\nFail akan masuk ke Sampah Google Drive (boleh dipulihkan dalam 30 hari).`)) return;
+    try {
+      if (p.adaPin) await mintaPin(`Masukkan PIN ${p.nama} untuk padam`, (pin) => panggilTerus('padamProfil', p.id, pin));
+      else await panggilTerus('padamProfil', p.id, '');
+    } catch (e) {
+      if (e !== 'batal') toast(mesejRalat(e), true);
+      return;
+    }
+    toast(`Profil ${p.nama} dipadam`);
+    await muatProfil();
+  }
+
+  // Dialog PIN: semak(pin) dipanggil di server; dialog kekal terbuka kalau PIN salah
+  let pinSelesai = null;
+  function mintaPin(teks, semak) {
+    return new Promise((ok, gagal) => {
+      const b = $('#borang-pin');
+      b.reset();
+      $('#pin-teks').textContent = teks;
+      $('#ralat-pin').hidden = true;
+      pinSelesai = { ok, gagal, semak };
+      $('#dialog-pin').showModal();
+      b.elements.pin.focus();
+    });
+  }
+
+  async function hantarPin(ev) {
+    ev.preventDefault();
+    const b = $('#borang-pin');
+    const pin = b.elements.pin.value;
+    const r = $('#ralat-pin');
+    if (!/^\d{4}$/.test(pin)) { r.textContent = 'PIN mesti 4 digit.'; r.hidden = false; return; }
+    const btn = $('#btn-pin-ok');
+    btn.disabled = true;
+    r.hidden = true;
+    try {
+      const hasil = await pinSelesai.semak(pin);
+      const { ok } = pinSelesai;
+      pinSelesai = null;
+      $('#dialog-pin').close();
+      ok(hasil);
+    } catch (e) {
+      r.textContent = mesejRalat(e);
+      r.hidden = false;
+      b.elements.pin.select();
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // Dialog tambah profil
+  let pilihanProfil = { ikon: IKON_PROFIL[0], warna: WARNA_PROFIL[0] };
+  function bukaTambahProfil() {
+    const b = $('#borang-profil');
+    b.reset();
+    pilihanProfil = {
+      ikon: IKON_PROFIL[profilList.length % IKON_PROFIL.length],
+      warna: WARNA_PROFIL[profilList.length % WARNA_PROFIL.length],
+    };
+    $('#ralat-profil').hidden = true;
+    paparPilihanProfil();
+    $('#dialog-profil').showModal();
+    b.elements.nama.focus();
+  }
+
+  function paparPilihanProfil() {
+    const pratonton = avatar(pilihanProfil);
+    pratonton.id = 'avatar-pratonton';
+    $('#avatar-pratonton').replaceWith(pratonton);
+    $('#pilih-ikon').replaceChildren(...IKON_PROFIL.map((i) => el('button', {
+      type: 'button', class: `pilihan ${i === pilihanProfil.ikon ? 'aktif' : ''}`, 'aria-label': `Ikon ${i}`,
+      onclick: () => { pilihanProfil.ikon = i; paparPilihanProfil(); },
+    }, i)));
+    $('#pilih-warna').replaceChildren(...WARNA_PROFIL.map((w) => el('button', {
+      type: 'button', class: `pilihan warna ${w === pilihanProfil.warna ? 'aktif' : ''}`, style: `background:${w}`, 'aria-label': `Warna ${w}`,
+      onclick: () => { pilihanProfil.warna = w; paparPilihanProfil(); },
+    })));
+  }
+
+  async function simpanProfil(ev) {
+    ev.preventDefault();
+    const b = $('#borang-profil');
+    const r = $('#ralat-profil');
+    const pin = b.elements.pin.value.trim();
+    if (pin && !/^\d{4}$/.test(pin)) { r.textContent = 'PIN mesti 4 digit nombor.'; r.hidden = false; return; }
+    const btn = $('#btn-simpan-profil');
+    btn.disabled = true;
+    r.hidden = true;
+    try {
+      await panggilTerus('tambahProfil', b.elements.nama.value.trim(), pilihanProfil.ikon, pilihanProfil.warna, pin);
+      $('#dialog-profil').close();
+      await muatProfil();
+    } catch (e) {
+      r.textContent = mesejRalat(e);
+      r.hidden = false;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // ---------- Muat fail ----------
+  async function muat() {
+    let d;
+    try {
+      d = await panggil('senarai');
+    } catch (e) {
+      if (!token) return;
+      $('#kosong').hidden = false;
+      $('#kosong').replaceChildren(el('div', { class: 'kosong-ikon' }, '⚠️'), el('p', {}, mesejRalat(e)));
+      return;
+    }
+    akarId = d.akarId;
+    folders = d.folders;
+    semua = d.fail;
+
+    $('#ruang-guna').textContent = `${semua.length} fail · ${saiz(semua.reduce((n, f) => n + f.saiz, 0))}`;
+    $('#ruang-had').textContent = d.guna
+      ? ` · Drive: ${saiz(d.guna)} digunakan${d.had > 0 && d.had < 1e15 ? ` daripada ${saiz(d.had)}` : ''}`
+      : '';
+    const peratus = d.had > 0 && d.had < 1e15 ? Math.min(100, (d.guna / d.had) * 100) : 0;
+    $('.ruang-bar').hidden = !peratus;
+    $('#ruang-isi').style.width = `${Math.max(peratus, 0.5)}%`;
+    $('#ruang-isi').classList.toggle('penuh', peratus > 85);
+
+    if (folderAktif && folderAktif !== akarId && !folders.some((f) => f.id === folderAktif)) folderAktif = '';
+    $('#senarai-folder').replaceChildren(
+      ...[...new Set([...folders.map((f) => f.nama), ...FOLDER_CADANGAN])].map((f) => el('option', {}, f)),
+    );
+    papar();
+  }
+
+  // ---------- Paparan ----------
+  function papar() {
+    const bil = (id) => semua.filter((x) => x.folderId === id).length;
+    const tab = (id, label, n) => el('button', {
+      class: `tab ${folderAktif === id ? 'aktif' : ''}`,
+      onclick: () => { folderAktif = id; papar(); },
+    }, label, n != null && el('span', { class: 'tab-bil' }, String(n)));
+    const tersusun = [...folders].sort((a, b) => a.nama.localeCompare(b.nama));
+    isi($('#tab-folder'),
+      tab('', '🗂️ Semua', semua.length),
+      bil(akarId) > 0 && tab(akarId, '📁 Utama', bil(akarId)),
+      ...tersusun.map((f) => tab(f.id, `📁 ${f.nama}`, bil(f.id))),
+      el('button', { class: 'tab tab-baru', onclick: folderBaru }, '+ Folder Baru'),
+    );
+
+    $('#tajuk-folder').hidden = !folderAktif;
+    $('#btn-nama-folder').hidden = folderAktif === akarId;
+    $('#btn-padam-folder').hidden = folderAktif === akarId;
+    if (folderAktif) $('#nama-folder').textContent = `📁 ${namaFolder(folderAktif)}`;
+
+    const q = $('#cari').value.trim().toLowerCase();
+    const susun = $('#susun').value;
+    const senarai = semua
+      .filter((f) => (!folderAktif || f.folderId === folderAktif)
+        && (!q || `${f.nama} ${namaFolder(f.folderId)}`.toLowerCase().includes(q)))
+      .sort((a, b) => {
+        if (susun === 'nama') return a.nama.localeCompare(b.nama, 'ms', { numeric: true });
+        if (susun === 'saiz') return b.saiz - a.saiz;
+        return (b.tarikh || '').localeCompare(a.tarikh || '');
+      });
+
+    $('#senarai').replaceChildren(...senarai.map(kadFail));
+    const k = $('#kosong');
+    k.hidden = senarai.length > 0;
+    if (!senarai.length) {
+      isi(k,
+        el('div', { class: 'kosong-ikon' }, q ? '🔍' : '📂'),
+        el('p', {}, q ? 'Tiada fail sepadan.' : folderAktif ? 'Folder ni kosong.' : 'Belum ada fail lagi.'),
+        !q && el('p', { class: 'pudar' }, 'Tekan ⬆ Upload Fail, atau seret fail ke sini.'),
+      );
+    }
+  }
+
+  function kadFail(f) {
+    const ikon = el('span', { class: 'kad-ikon' }, ikonFail(f));
+    const gambar = f.thumb && el('img', {
+      src: f.thumb, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer',
+      onerror: (ev) => ev.target.replaceWith(ikon),
+    });
+
+    return el('article', { class: 'kad' },
+      el('button', { class: 'kad-pratonton', title: 'Buka', onclick: () => bukaFail(f) }, gambar || ikon),
+      el('div', { class: 'kad-badan' },
+        el('button', { class: 'kad-nama', title: f.nama, onclick: () => bukaFail(f) }, f.nama),
+        el('div', { class: 'kad-meta pudar' },
+          !folderAktif && el('span', {}, `📁 ${namaFolder(f.folderId)}`),
+          f.saiz > 0 && el('span', {}, saiz(f.saiz)),
+          el('span', {}, tarikh(f.tarikh)),
+        ),
+        el('div', { class: 'kad-aksi' },
+          el('button', { class: 'btn ikon', title: 'Muat turun', 'aria-label': 'Muat turun', onclick: () => muatTurun(f) }, '⬇️'),
+          el('button', { class: 'btn ikon', title: 'Tukar nama', 'aria-label': 'Tukar nama', onclick: () => tukarNamaFail(f) }, '✏️'),
+          el('button', { class: 'btn ikon', title: 'Pindah folder', 'aria-label': 'Pindah folder', onclick: () => pindahFail(f) }, '📁'),
+          el('button', { class: 'btn ikon', title: 'Padam', 'aria-label': 'Padam', onclick: () => padamFail(f) }, '🗑️'),
+        ),
+      ),
+    );
+  }
+
+  // ---------- Buka / muat turun (fail diambil melalui server dalam cebisan) ----------
+  const base64KeBait = (b64) => {
+    const s = atob(b64);
+    const out = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+    return out;
+  };
+
+  async function ambilFail(f) {
+    if (isGoogleDoc(f)) {
+      toast('Menyediakan PDF…', false, true);
+      const r = await panggil('eksportPdf', f.id);
+      return { blob: new Blob([base64KeBait(r.b64)], { type: 'application/pdf' }), nama: r.nama };
+    }
+    const bahagian = [];
+    for (let mula = 0; mula < f.saiz; mula += CEBISAN_TURUN) {
+      toast(`Memuatkan ${f.nama}… ${Math.round((mula / f.saiz) * 100)}%`, false, true);
+      bahagian.push(base64KeBait(await panggil('bacaCebisan', f.id, mula, Math.min(CEBISAN_TURUN, f.saiz - mula))));
+    }
+    return { blob: new Blob(bahagian, { type: f.jenis || 'application/octet-stream' }), nama: f.nama };
+  }
+
+  async function bukaFail(f) {
+    const w = window.open('', '_blank'); // buka dulu supaya tak disekat popup blocker
+    if (w) w.document.write('<p style="font-family:system-ui;padding:20px">Memuatkan…</p>');
+    try {
+      const { blob } = await ambilFail(f);
+      const url = URL.createObjectURL(blob);
+      if (w) w.location.href = url; else window.open(url, '_blank');
+      $('#toast').hidden = true;
+    } catch (e) {
+      w?.close();
+      toast(mesejRalat(e), true);
+    }
+  }
+
+  async function muatTurun(f) {
+    try {
+      const { blob, nama } = await ambilFail(f);
+      const url = URL.createObjectURL(blob);
+      const a = el('a', { href: url, download: nama });
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      toast(`${nama} dimuat turun ✔`);
+    } catch (e) {
+      toast(mesejRalat(e), true);
+    }
+  }
+
+  // ---------- Folder ----------
+  // Cari folder ikut nama (abaikan huruf besar/kecil); buat baru kalau belum ada
+  async function idFolder(nama) {
+    nama = nama.trim();
+    if (!nama) throw new Error('Nama folder tidak sah.');
+    if (nama.toLowerCase() === 'utama') return akarId;
+    const ada = folders.find((f) => f.nama.toLowerCase() === nama.toLowerCase());
+    if (ada) return ada.id;
+    const id = await panggil('folderBaru', nama);
+    folders.push({ id, nama });
+    return id;
+  }
+
+  function folderBaru() {
+    mintaTeks({
+      tajuk: 'Folder baru', label: 'Nama folder', nilai: '',
+      ok: async (v) => {
+        if (folders.some((f) => f.nama.toLowerCase() === v.toLowerCase())) throw new Error('Folder tu dah wujud.');
+        folderAktif = await idFolder(v);
+      },
+    });
+  }
+
+  function tukarNamaFolder() {
+    const id = folderAktif;
+    mintaTeks({
+      tajuk: 'Tukar nama folder', label: 'Nama baru', nilai: namaFolder(id),
+      ok: async (v) => {
+        if (folders.some((f) => f.id !== id && f.nama.toLowerCase() === v.toLowerCase())) throw new Error('Folder tu dah wujud.');
+        await panggil('tukarNamaFolder', id, v);
+        toast('Nama folder ditukar');
+      },
+    });
+  }
+
+  async function padamFolder() {
+    const id = folderAktif;
+    const n = semua.filter((x) => x.folderId === id).length;
+    if (!confirm(`Padam folder "${namaFolder(id)}"${n ? ` dan ${n} fail di dalamnya` : ''}?\nIa akan masuk ke Sampah Google Drive (boleh dipulihkan dalam 30 hari).`)) return;
+    try {
+      await panggil('padamFolder', id);
+    } catch (e) { toast(mesejRalat(e), true); return; }
+    folderAktif = '';
+    toast('Folder dipindah ke Sampah');
+    await muat();
+  }
+
+  // ---------- Fail ----------
+  function tukarNamaFail(f) {
+    const titik = f.nama.lastIndexOf('.');
+    mintaTeks({
+      tajuk: 'Tukar nama fail', label: 'Nama baru', nilai: f.nama,
+      pilih: titik > 0 ? [0, titik] : null,
+      ok: async (v) => {
+        await panggil('tukarNamaFail', f.id, v);
+        toast('Nama ditukar');
+      },
+    });
+  }
+
+  function pindahFail(f) {
+    mintaTeks({
+      tajuk: 'Pindah ke folder', label: 'Folder', nilai: '', senarai: true,
+      ok: async (v) => {
+        const id = await idFolder(v);
+        if (id === f.folderId) return;
+        await panggil('pindahFail', f.id, id);
+        toast(`Dipindah ke ${namaFolder(id)}`);
+      },
+    });
+  }
+
+  async function padamFail(f) {
+    if (!confirm(`Padam "${f.nama}"?\nIa akan masuk ke Sampah Google Drive (boleh dipulihkan dalam 30 hari).`)) return;
+    try {
+      await panggil('padamFail', f.id);
+    } catch (e) { toast(mesejRalat(e), true); return; }
+    semua = semua.filter((x) => x.id !== f.id);
+    papar();
+    toast('Fail dipindah ke Sampah');
+  }
+
+  // ---------- Dialog teks ----------
+  let tindakanTeks = null;
+  function mintaTeks({ tajuk, label, nilai, ok, senarai = false, pilih = null }) {
+    const b = $('#borang-teks');
+    $('#teks-tajuk').textContent = tajuk;
+    $('#teks-label').textContent = label;
+    $('#ralat-teks').hidden = true;
+    b.elements.nilai.value = nilai;
+    if (senarai) b.elements.nilai.setAttribute('list', 'senarai-folder');
+    else b.elements.nilai.removeAttribute('list');
+    tindakanTeks = ok;
+    $('#dialog-teks').showModal();
+    b.elements.nilai.focus();
+    if (pilih) b.elements.nilai.setSelectionRange(...pilih);
+    else b.elements.nilai.select();
+  }
+
+  async function hantarTeks(ev) {
+    ev.preventDefault();
+    const btn = $('#btn-teks-ok');
+    const r = $('#ralat-teks');
+    const v = $('#borang-teks').elements.nilai.value.trim();
+    if (!v) return;
+    btn.disabled = true;
+    btn.textContent = 'Sekejap…';
+    r.hidden = true;
+    try {
+      await tindakanTeks(v);
+      await muat();
+      $('#dialog-teks').close();
+    } catch (e) {
+      r.textContent = mesejRalat(e);
+      r.hidden = false;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'OK';
+    }
+  }
+
+  // ---------- Upload ----------
+  function bukaUpload(fileList) {
+    failUpload = [];
+    tambahFailUpload(fileList);
+    if (!failUpload.length) return;
+    const lalai = folderAktif ? namaFolder(folderAktif) : (folders[0]?.nama || 'Kerja');
+    $('#borang-upload').elements.folder.value = lalai;
+    $('#ralat-upload').hidden = true;
+    if (!$('#dialog-upload').open) $('#dialog-upload').showModal();
+  }
+
+  function tambahFailUpload(fileList) {
+    failUpload.push(...fileList);
+    paparUpload();
+  }
+
+  function paparUpload() {
+    $('#senarai-upload').replaceChildren(...failUpload.map((f, i) => el('li', {},
+      el('span', { class: 'fail-nama' }, `${ikonFail({ nama: f.name, jenis: f.type || '' })} ${f.name}`),
+      el('span', { class: 'pudar kecil' }, saiz(f.size)),
+      el('button', {
+        type: 'button', class: 'btn ikon kecil', title: 'Buang', 'aria-label': 'Buang',
+        onclick: () => { failUpload.splice(i, 1); paparUpload(); if (!failUpload.length) $('#dialog-upload').close(); },
+      }, '✕'),
+    )));
+    $('#btn-mula-upload').textContent = `Upload ${failUpload.length} fail`;
+  }
+
+  const bacaBase64 = (blob) => new Promise((ok, gagal) => {
+    const r = new FileReader();
+    r.onload = () => ok(String(r.result).split(',')[1] || '');
+    r.onerror = () => gagal(r.error);
+    r.readAsDataURL(blob);
+  });
+
+  async function uploadSatu(f, folderId, kemajuan) {
+    const sesi = await panggil('mulaUpload', folderId, f.name, f.type || 'application/octet-stream', f.size);
+    if (f.size === 0) { await panggil('hantarCebisan', sesi, '', 0, 0); return; }
+    for (let mula = 0; mula < f.size; mula += CEBISAN_UP) {
+      const b64 = await bacaBase64(f.slice(mula, mula + CEBISAN_UP));
+      await panggil('hantarCebisan', sesi, b64, mula, f.size);
+      kemajuan(Math.min(f.size, mula + CEBISAN_UP) / f.size);
+    }
+  }
+
+  async function mulaUpload(ev) {
+    ev.preventDefault();
+    const btn = $('#btn-mula-upload');
+    const r = $('#ralat-upload');
+    r.hidden = true;
+    btn.disabled = true;
+    const jumlah = failUpload.length;
+    let berjaya = 0;
+    let folderId = '';
+    try {
+      btn.textContent = 'Sekejap…';
+      folderId = await idFolder($('#borang-upload').elements.folder.value);
+      while (failUpload.length) {
+        const f = failUpload[0];
+        const label = `Upload ${berjaya + 1}/${jumlah}`;
+        btn.textContent = `${label}…`;
+        await uploadSatu(f, folderId, (p) => { btn.textContent = `${label} · ${Math.round(p * 100)}%`; });
+        failUpload.shift();
+        berjaya++;
+        paparUpload();
+      }
+      $('#dialog-upload').close();
+      if (folderAktif) folderAktif = folderId;
+      toast(`${berjaya} fail diupload ke ${namaFolder(folderId)} ✔`);
+    } catch (e) {
+      r.textContent = `${berjaya ? `${berjaya} fail berjaya. ` : ''}Gagal: ${mesejRalat(e)}`;
+      r.hidden = false;
+    } finally {
+      btn.disabled = false;
+      paparUpload();
+      if (berjaya && token) await muat();
+    }
+  }
+
+  // ---------- Acara ----------
+  $('#btn-urus-profil').addEventListener('click', () => { modUrus = !modUrus; paparProfil(); });
+  $('#btn-tukar-profil').addEventListener('click', keluarProfil);
+  $('#borang-profil').addEventListener('submit', simpanProfil);
+  $('#borang-pin').addEventListener('submit', hantarPin);
+  $('#dialog-pin').addEventListener('close', () => { if (pinSelesai) { pinSelesai.gagal('batal'); pinSelesai = null; } });
+  $('#btn-upload').addEventListener('click', () => $('#input-fail').click());
+  $('#input-fail').addEventListener('change', (ev) => { bukaUpload(ev.target.files); ev.target.value = ''; });
+  $('#input-fail-tambah').addEventListener('change', (ev) => { tambahFailUpload(ev.target.files); ev.target.value = ''; });
+  $('#borang-upload').addEventListener('submit', mulaUpload);
+  $('#borang-teks').addEventListener('submit', hantarTeks);
+  $('#btn-nama-folder').addEventListener('click', tukarNamaFolder);
+  $('#btn-padam-folder').addEventListener('click', padamFolder);
+  document.querySelectorAll('[data-tutup]').forEach((b) => b.addEventListener('click', () => b.closest('dialog').close()));
+  ['#cari', '#susun'].forEach((s) => $(s).addEventListener('input', papar));
+
+  // Seret & lepas fail ke mana-mana bahagian skrin (hanya bila dalam profil)
+  const lapisan = $('#lapisan-seret');
+  let kiraSeret = 0;
+  const bolehSeret = (ev) => token && [...(ev.dataTransfer?.types || [])].includes('Files');
+  window.addEventListener('dragenter', (ev) => {
+    if (!bolehSeret(ev)) return;
+    ev.preventDefault();
+    kiraSeret++;
+    if (!$('#dialog-upload').open) lapisan.hidden = false;
+  });
+  window.addEventListener('dragover', (ev) => { if (bolehSeret(ev)) ev.preventDefault(); });
+  window.addEventListener('dragleave', () => { if (--kiraSeret <= 0) { kiraSeret = 0; lapisan.hidden = true; } });
+  window.addEventListener('drop', (ev) => {
+    if (!bolehSeret(ev)) return;
+    ev.preventDefault();
+    kiraSeret = 0;
+    lapisan.hidden = true;
+    if ($('#dialog-upload').open) tambahFailUpload(ev.dataTransfer.files);
+    else bukaUpload(ev.dataTransfer.files);
+  });
+
+  muatProfil();
+})();
+  </script>
+</body>
+</html>
