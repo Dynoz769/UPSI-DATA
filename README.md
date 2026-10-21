@@ -17,7 +17,7 @@ public/            ← website (ini yang dihoskan)
   js/config.js     ← isi URL & key Supabase di sini
   js/app.js
 supabase/setup.sql ← skrip database + storage
-.github/workflows/pages.yml ← deploy automatik ke GitHub Pages
+.github/workflows/jekyll-gh-pages.yml ← deploy folder public/ ke GitHub Pages
 ```
 
 ## Cara setup (±15 minit, semua percuma)
@@ -42,7 +42,7 @@ supabase/setup.sql ← skrip database + storage
 ### 4. Letak online
 **Pilihan A: GitHub Pages** (repo kena *public* untuk akaun GitHub percuma)
 1. Repo → **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-2. Setiap push ke `main` akan deploy automatik. Alamat: `https://dynoz769.github.io/UPSI-DATA/`.
+2. Setiap push ke branch `claude/determined-davinci-4kv5sx` akan deploy automatik (tukar di `.github/workflows/jekyll-gh-pages.yml` kalau nak guna branch lain). Alamat: `https://dynoz769.github.io/UPSI-DATA/`.
 
 **Pilihan B: Cloudflare Pages / Netlify** (percuma, boleh guna repo *private*)
 1. Sambungkan repo ni, tetapkan **Build command**: kosong, **Output directory**: `public`.
