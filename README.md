@@ -13,10 +13,10 @@ Ada dua versi:
 
 | | **Google Drive (Apps Script)** ← utama | Supabase (versi lama) |
 |---|---|---|
-| Folder | `apps-script/` | `public/`, `supabase/` |
+| Folder | `apps-script/` | `public/lama/`, `supabase/` |
 | Ruang | Ikut kuota Google Drive akaun kau | 1 GB percuma |
 | Saiz fail | Tiada had praktikal (dihantar dalam cebisan 8MB) | 50 MB |
-| Alamat | `script.google.com/macros/s/.../exec` | `dynoz769.github.io/UPSI-DATA` |
+| Alamat | [Web app MOE](https://script.google.com/a/macros/moe-dl.edu.my/s/AKfycbxoYc8-PWiF9fhsElI5qLJ5NndhSPgtyp1f2TGRiLpMPJVGiQDoxVTStflm_3x15O_eRw/exec) (juga `dynoz769.github.io/UPSI-DATA`, yang terus bawa ke sini) | `dynoz769.github.io/UPSI-DATA/lama/` |
 
 ---
 
@@ -78,11 +78,13 @@ Tampal kod baru → **Save** → **Deploy → Manage deployments** → ✏️ �
 ## Struktur
 
 ```
-public/            ← website (ini yang dihoskan)
-  index.html
-  css/style.css
-  js/config.js     ← URL & key Supabase
-  js/app.js
+public/
+  index.html       ← halaman yang terus bawa ke web app Apps Script
+  lama/            ← website versi Supabase
+    index.html
+    css/style.css
+    js/config.js   ← URL & key Supabase
+    js/app.js
 supabase/setup.sql ← skrip setup database + storage
 .github/workflows/jekyll-gh-pages.yml ← deploy folder public/ ke GitHub Pages
 ```
@@ -103,7 +105,7 @@ Fail disimpan dalam Supabase Storage di `<id pengguna>/<folder>/<nama fail>`. Ti
 
 ### 3. Sambungkan website ke Supabase
 1. **Project Settings → API**: salin **Project URL** dan **anon public key**.
-2. Masukkan dalam `public/js/config.js`.
+2. Masukkan dalam `public/lama/js/config.js`.
    > Anon key memang direka untuk didedahkan dalam frontend. Fail kau dilindungi oleh login + polisi keselamatan, bukan oleh key ni.
    > **Jangan sekali-kali** letak `service_role` key di sini.
 
@@ -113,7 +115,7 @@ Fail disimpan dalam Supabase Storage di `<id pengguna>/<folder>/<nama fail>`. Ti
 2. Setiap push ke branch `claude/determined-davinci-4kv5sx` akan deploy automatik (tukar di `.github/workflows/jekyll-gh-pages.yml` kalau nak guna branch lain). Alamat: `https://dynoz769.github.io/UPSI-DATA/`.
 
 **Pilihan B: Cloudflare Pages / Netlify** (percuma, boleh guna repo *private*)
-1. Sambungkan repo ni, tetapkan **Build command**: kosong, **Output directory**: `public`.
+1. Sambungkan repo ni, tetapkan **Build command**: kosong, **Output directory**: `public/lama`.
 2. Deploy. Dapat alamat macam `upsi-data.pages.dev`.
 
 > Kod website boleh nampak public, tapi tu tak apa: tanpa log masuk, tiada sesiapa boleh buka fail kau.
@@ -123,7 +125,7 @@ Fail disimpan dalam Supabase Storage di `<id pengguna>/<folder>/<nama fail>`. Ti
 
 ## Cuba di komputer sendiri
 ```bash
-cd public
+cd public/lama
 python3 -m http.server 8000
 # buka http://localhost:8000
 ```
