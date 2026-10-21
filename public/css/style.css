@@ -124,6 +124,24 @@ label > input, label > select, label > textarea { margin-top: 4px; font-size: 1r
 .stat-label { color: var(--muted); font-size: .85em; }
 .stat.amaran .stat-nilai { color: var(--danger); }
 
+/* Tab kategori */
+.tab-baris {
+  display: flex; gap: 6px; margin-bottom: 14px; padding-bottom: 2px;
+  overflow-x: auto; scrollbar-width: thin;
+}
+.tab {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  padding: 6px 12px; border-radius: 999px; font: inherit; font-size: .9em; cursor: pointer;
+}
+.tab:hover { background: var(--surface-2); }
+.tab.aktif { background: var(--primary); border-color: var(--primary); color: var(--primary-text); font-weight: 600; }
+.tab-bil {
+  font-size: .8em; padding: 0 6px; border-radius: 999px;
+  background: var(--surface-2); color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.tab.aktif .tab-bil { background: color-mix(in srgb, var(--primary-text) 22%, transparent); color: inherit; }
+
 /* Alat */
 .alat { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
 .alat #cari { flex: 1 1 240px; }
@@ -143,6 +161,7 @@ label > input, label > select, label > textarea { margin-top: 4px; font-size: 1r
   font-size: .75em; font-weight: 600; padding: 2px 8px; border-radius: 999px;
   background: var(--surface-2); color: var(--muted);
 }
+.lencana.kategori { background: var(--surface-2); color: var(--text); }
 .lencana.kursus { background: color-mix(in srgb, var(--primary) 15%, transparent); color: var(--primary); }
 .st-belum { color: var(--muted); }
 .st-proses { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }

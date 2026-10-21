@@ -23,7 +23,7 @@
   <section id="skrin-login" class="skrin tengah" hidden>
     <form id="borang-login" class="kotak">
       <h1>📚 UPSI-DATA</h1>
-      <p class="pudar">Log masuk untuk akses tugasan kau.</p>
+      <p class="pudar">Log masuk untuk akses barang kau.</p>
       <label>Emel
         <input type="email" name="emel" autocomplete="username" required>
       </label>
@@ -48,8 +48,10 @@
     <main class="isi">
       <div class="statistik" id="statistik"></div>
 
+      <nav id="tab-kategori" class="tab-baris" aria-label="Kategori"></nav>
+
       <div class="alat">
-        <input id="cari" type="search" placeholder="Cari tajuk, kursus, pensyarah, tag…">
+        <input id="cari" type="search" placeholder="Cari tajuk, kursus, tag, nama fail…">
         <select id="tapis-semester"><option value="">Semua semester</option></select>
         <select id="tapis-status">
           <option value="">Semua status</option>
@@ -63,11 +65,11 @@
           <option value="baru">Terbaru ditambah</option>
           <option value="kursus">Ikut kod kursus</option>
         </select>
-        <button id="btn-tambah" class="btn utama">+ Tugasan Baru</button>
+        <button id="btn-tambah" class="btn utama">+ Tambah Baru</button>
       </div>
 
       <div id="senarai" class="senarai"></div>
-      <p id="kosong" class="kosong" hidden>Tiada tugasan lagi. Tekan <b>+ Tugasan Baru</b> untuk mula.</p>
+      <p id="kosong" class="kosong" hidden></p>
     </main>
   </section>
 
@@ -75,12 +77,16 @@
   <dialog id="dialog-borang">
     <form id="borang" method="dialog">
       <div class="dialog-kepala">
-        <h2 id="tajuk-borang">Tugasan Baru</h2>
+        <h2 id="tajuk-borang">Tambah Baru</h2>
         <button type="button" class="btn ikon" data-tutup aria-label="Tutup">✕</button>
       </div>
 
       <div class="grid">
-        <label class="lebar">Tajuk tugasan *
+        <label>Kategori *
+          <input name="kategori" list="senarai-kategori" required placeholder="cth: Tugasan">
+          <datalist id="senarai-kategori"></datalist>
+        </label>
+        <label>Tajuk *
           <input name="tajuk" required placeholder="cth: Esei Kritikan Sastera">
         </label>
         <label>Kod kursus
@@ -93,7 +99,7 @@
           <input name="semester" list="senarai-semester" placeholder="cth: Sem 3 2025/2026">
           <datalist id="senarai-semester"></datalist>
         </label>
-        <label>Jenis
+        <label class="hanya-tugasan">Jenis
           <input name="jenis" list="senarai-jenis" placeholder="cth: Individu">
           <datalist id="senarai-jenis">
             <option>Individu</option><option>Berkumpulan</option><option>Kuiz</option>
@@ -103,10 +109,10 @@
         <label>Pensyarah
           <input name="pensyarah">
         </label>
-        <label>Tarikh hantar
+        <label class="hanya-tugasan">Tarikh hantar
           <input name="tarikh_hantar" type="date">
         </label>
-        <label>Status
+        <label class="hanya-tugasan">Status
           <select name="status">
             <option>Belum Mula</option>
             <option>Dalam Proses</option>
@@ -114,7 +120,7 @@
             <option>Dihantar</option>
           </select>
         </label>
-        <label>Markah / Gred
+        <label class="hanya-tugasan">Markah / Gred
           <input name="markah" placeholder="cth: 18/20 atau A-">
         </label>
         <label class="lebar">Tag (asingkan dengan koma)
