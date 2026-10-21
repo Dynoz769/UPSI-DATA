@@ -1,194 +1,213 @@
-  <!-- Latar: aurora + gambar sendiri + galaksi 3D (canvas) -->
-  <div id="latar" class="latar" aria-hidden="true">
-    <div class="aurora"><span></span><span></span><span></span></div>
-    <div id="latar-gambar" class="latar-gambar"><div id="latar-gambar-isi" class="latar-gambar-isi"></div></div>
-    <canvas id="latar-3d"></canvas>
-    <div class="vignet"></div>
-  </div>
+  <!-- Latar: kecerunan lembut lalai, atau gambar sendiri setiap profil -->
+  <div id="latar" class="latar" aria-hidden="true"><div id="latar-imej" class="latar-imej"></div></div>
 
   <!-- Skrin: pilih profil -->
   <section id="skrin-profil" class="skrin skrin-profil">
-    <div class="jenama-besar">📁 UPSI-DATA</div>
-    <h1 id="tajuk-profil">Siapa yang guna?</h1>
-    <div id="grid-profil" class="grid-profil"><p class="pudar">Memuatkan…</p></div>
-    <button id="btn-urus-profil" class="btn btn-urus" hidden>Urus Profil</button>
-    <p id="saya-profil" class="pudar kecil saya"></p>
+    <div class="profil-bekas">
+      <div class="jenama jenama-besar"><span class="logo" aria-hidden="true"></span><span>UPSI-DATA</span></div>
+      <h1 id="tajuk-profil">Siapa yang guna?</h1>
+      <p id="sub-profil" class="sub-profil">Pilih profil untuk teruskan</p>
+      <div id="grid-profil" class="grid-profil" aria-live="polite"></div>
+      <button id="btn-urus-profil" class="btn btn-garis" type="button" hidden>
+        <svg class="ik" data-ikon="pensel"></svg><span>Urus profil</span>
+      </button>
+      <p id="saya-profil" class="saya"></p>
+    </div>
   </section>
 
   <!-- Skrin: fail -->
   <section id="skrin-utama" class="skrin" hidden>
-  <header class="atas">
-    <div class="jenama">📁 UPSI-DATA</div>
-    <span id="saya-header" class="pudar kecil saya-header"></span>
-    <button id="btn-latar" class="btn ikon btn-latar" title="Tukar latar belakang" aria-label="Tukar latar belakang">🎨</button>
-    <button id="btn-tukar-profil" class="profil-kecil" title="Tukar profil">
-      <span id="avatar-kecil" class="avatar avatar-kecil"></span>
-      <span id="nama-profil-kecil"></span>
-      <span class="pudar kecil">▾</span>
-    </button>
-  </header>
+    <header class="bar-atas">
+      <div class="bar-atas-isi">
+        <button id="btn-logo" class="jenama jenama-kecil" type="button" aria-label="Ke halaman utama">
+          <span class="logo" aria-hidden="true"></span><span class="jenama-teks">UPSI-DATA</span>
+        </button>
+        <label class="cari">
+          <svg class="ik" data-ikon="cari"></svg>
+          <input id="cari" type="search" placeholder="Cari fail atau folder" autocomplete="off" aria-label="Cari fail atau folder">
+        </label>
+        <button id="btn-profil-menu" class="butang-profil" type="button" aria-haspopup="menu" aria-expanded="false">
+          <span id="avatar-kecil" class="avatar avatar-kecil"></span>
+          <span id="nama-profil-kecil" class="nama-profil-kecil"></span>
+          <svg class="ik ik-kecil" data-ikon="bawah"></svg>
+        </button>
+      </div>
+    </header>
 
-  <main class="isi">
-    <div class="ruang">
-      <div class="ruang-teks"><span id="ruang-guna"></span><span class="pudar" id="ruang-had"></span></div>
-      <div class="ruang-bar"><div id="ruang-isi"></div></div>
-    </div>
+    <main class="isi" id="isi">
+      <div class="kepala-halaman">
+        <nav id="serbuk" class="serbuk" aria-label="Lokasi"></nav>
+        <div class="tindakan-halaman">
+          <div class="segmen" role="group" aria-label="Jenis paparan">
+            <span class="segmen-penunjuk" aria-hidden="true"></span>
+            <button type="button" class="segmen-btn" data-paparan="grid" aria-label="Paparan grid" title="Grid"><svg class="ik" data-ikon="grid"></svg></button>
+            <button type="button" class="segmen-btn" data-paparan="senarai" aria-label="Paparan senarai" title="Senarai"><svg class="ik" data-ikon="senarai"></svg></button>
+          </div>
+          <label class="pilih-susun">
+            <span class="sr">Susun ikut</span>
+            <select id="susun">
+              <option value="baru">Terbaru</option>
+              <option value="nama">Nama A–Z</option>
+              <option value="saiz">Saiz terbesar</option>
+            </select>
+          </label>
+          <button id="btn-baru" class="btn btn-utama" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Baru: upload fail, upload folder atau folder baru">
+            <svg class="ik" data-ikon="tambah"></svg><span>Baru</span>
+          </button>
+        </div>
+      </div>
+      <p id="ruang" class="ruang"></p>
 
-    <div class="tab-bungkus">
-      <span id="tab-penunjuk" class="tab-penunjuk"></span>
-      <nav id="tab-folder" class="tab-baris" aria-label="Folder"></nav>
-    </div>
+      <section id="bahagian-folder" class="bahagian" hidden>
+        <h2 class="tajuk-bahagian">Folder</h2>
+        <div id="grid-folder" class="grid"></div>
+      </section>
+      <section id="bahagian-fail" class="bahagian">
+        <h2 id="tajuk-fail" class="tajuk-bahagian" hidden>Fail</h2>
+        <div class="kepala-senarai" aria-hidden="true">
+          <span>Nama</span><span>Oleh</span><span>Tarikh</span><span>Saiz</span><span></span>
+        </div>
+        <div id="senarai" class="grid"></div>
+      </section>
+      <div id="kosong" class="kosong" hidden></div>
 
-    <div class="alat">
-      <input id="cari" type="search" placeholder="Cari nama fail…">
-      <select id="susun" aria-label="Susun">
-        <option value="baru">Terbaru</option>
-        <option value="nama">Nama A–Z</option>
-        <option value="saiz">Saiz terbesar</option>
-      </select>
-      <button id="btn-upload-folder" class="btn">📁 Upload Folder</button>
-      <button id="btn-upload" class="btn utama">⬆ Upload Fail</button>
       <input id="input-fail" type="file" multiple hidden>
       <input id="input-folder" type="file" webkitdirectory multiple hidden>
-    </div>
-
-    <div id="tajuk-folder" class="tajuk-folder" hidden>
-      <h2 id="nama-folder"></h2>
-      <button id="btn-nama-folder" class="btn kecil">✏️ Tukar nama</button>
-      <button id="btn-padam-folder" class="btn kecil bahaya">🗑️ Padam folder</button>
-    </div>
-
-    <section id="bahagian-folder" hidden>
-      <h3 class="tajuk-bahagian">Folder</h3>
-      <div id="grid-folder" class="grid-folder"></div>
-    </section>
-    <h3 id="tajuk-fail" class="tajuk-bahagian" hidden>Fail</h3>
-    <div id="senarai" class="senarai"></div>
-    <div id="kosong" class="kosong"></div>
-  </main>
+    </main>
   </section>
 
-  <div id="lapisan-seret" class="lapisan-seret" hidden><div>Lepaskan untuk upload</div></div>
+  <!-- Menu timbul (dikongsi) -->
+  <div id="menu-latar" class="menu-latar" hidden></div>
+  <div id="menu" class="menu" role="menu" hidden></div>
+
+  <!-- Seret & lepas -->
+  <div id="lapisan-seret" class="lapisan-seret" hidden>
+    <div class="seret-kotak">
+      <svg class="ik" data-ikon="awan"></svg>
+      <strong>Lepaskan untuk upload</strong>
+      <span>Fail dan folder akan disimpan dalam profil ini</span>
+    </div>
+  </div>
 
   <!-- Dialog upload -->
-  <dialog id="dialog-upload">
+  <dialog id="dialog-upload" aria-labelledby="tajuk-upload">
     <form id="borang-upload" method="dialog">
       <div class="dialog-kepala">
-        <h2>Upload Fail</h2>
-        <button type="button" class="btn ikon" data-tutup aria-label="Tutup">✕</button>
+        <h2 id="tajuk-upload">Upload fail</h2>
+        <button type="button" class="btn-ikon" data-tutup aria-label="Tutup"><svg class="ik" data-ikon="tutup"></svg></button>
       </div>
-      <label id="label-folder-upload">Simpan dalam folder
-        <input name="folder" list="senarai-folder" placeholder="cth: Kerja">
+      <label id="label-folder-upload" class="medan">
+        <span>Simpan dalam folder</span>
+        <input name="folder" list="senarai-folder" placeholder="cth: Kerja" autocomplete="off">
       </label>
-      <p id="nota-folder-upload" class="pudar kecil" hidden>Fail dari folder akan disimpan dalam folder dengan nama yang sama.</p>
-      <ul id="senarai-upload" class="fail-senarai"></ul>
-      <label class="zon-lepas">
+      <p id="nota-folder-upload" class="nota" hidden>Fail dari folder akan disimpan dalam folder dengan nama yang sama.</p>
+      <ul id="senarai-upload" class="senarai-upload"></ul>
+      <label class="tambah-lagi">
         <input id="input-fail-tambah" type="file" multiple hidden>
-        <span>+ Tambah fail lagi</span>
+        <svg class="ik" data-ikon="tambah"></svg><span>Tambah fail lagi</span>
       </label>
-      <div id="kemajuan-upload" class="bar-upload" hidden><div></div></div>
-      <p id="ralat-upload" class="ralat" hidden></p>
+      <div id="kemajuan-upload" class="bar-kemajuan" hidden><div></div></div>
+      <p id="ralat-upload" class="ralat" role="alert" hidden></p>
       <div class="dialog-kaki">
-        <button type="button" class="btn" data-tutup>Batal</button>
-        <button type="submit" id="btn-mula-upload" class="btn utama">Upload</button>
+        <button type="button" class="btn btn-garis" data-tutup>Batal</button>
+        <button type="submit" id="btn-mula-upload" class="btn btn-utama">Upload</button>
       </div>
     </form>
   </dialog>
 
-  <!-- Dialog teks ringkas: folder baru / tukar nama / pindah -->
-  <dialog id="dialog-teks">
+  <!-- Dialog teks: folder baru / tukar nama / pindah -->
+  <dialog id="dialog-teks" aria-labelledby="teks-tajuk">
     <form id="borang-teks" method="dialog">
       <div class="dialog-kepala">
         <h2 id="teks-tajuk"></h2>
-        <button type="button" class="btn ikon" data-tutup aria-label="Tutup">✕</button>
+        <button type="button" class="btn-ikon" data-tutup aria-label="Tutup"><svg class="ik" data-ikon="tutup"></svg></button>
       </div>
-      <label><span id="teks-label"></span>
+      <label class="medan"><span id="teks-label"></span>
         <input name="nilai" required autocomplete="off">
       </label>
-      <p id="ralat-teks" class="ralat" hidden></p>
+      <p id="ralat-teks" class="ralat" role="alert" hidden></p>
       <div class="dialog-kaki">
-        <button type="button" class="btn" data-tutup>Batal</button>
-        <button type="submit" id="btn-teks-ok" class="btn utama">OK</button>
+        <button type="button" class="btn btn-garis" data-tutup>Batal</button>
+        <button type="submit" id="btn-teks-ok" class="btn btn-utama">Simpan</button>
       </div>
     </form>
   </dialog>
 
-  <!-- Dialog tambah profil -->
-  <dialog id="dialog-profil">
+  <!-- Dialog tambah / edit profil -->
+  <dialog id="dialog-profil" aria-labelledby="tajuk-dialog-profil">
     <form id="borang-profil" method="dialog">
       <div class="dialog-kepala">
-        <h2 id="tajuk-dialog-profil">Tambah Profil</h2>
-        <button type="button" class="btn ikon" data-tutup aria-label="Tutup">✕</button>
+        <h2 id="tajuk-dialog-profil">Tambah profil</h2>
+        <button type="button" class="btn-ikon" data-tutup aria-label="Tutup"><svg class="ik" data-ikon="tutup"></svg></button>
       </div>
       <div class="profil-pratonton">
-        <span id="avatar-pratonton" class="avatar"></span>
+        <span id="avatar-pratonton" class="avatar avatar-besar"></span>
         <div class="profil-gambar-btn">
-          <button type="button" id="btn-pilih-gambar" class="btn kecil">🖼️ Upload gambar</button>
-          <button type="button" id="btn-buang-gambar" class="btn kecil" hidden>Buang gambar</button>
+          <button type="button" id="btn-pilih-gambar" class="btn btn-garis btn-kecil"><svg class="ik" data-ikon="gambar"></svg><span>Upload foto</span></button>
+          <button type="button" id="btn-buang-gambar" class="btn btn-teks btn-kecil" hidden>Buang foto</button>
           <input id="input-gambar-profil" type="file" accept="image/*" hidden>
         </div>
+        <p id="info-dibuat" class="nota tengah" hidden></p>
       </div>
-      <p id="info-dibuat" class="pudar kecil info-dibuat" hidden></p>
-      <label>Nama
+      <label class="medan"><span>Nama</span>
         <input name="nama" required maxlength="30" autocomplete="off" placeholder="cth: Adam">
       </label>
-      <div class="label-kecil">Ikon</div>
-      <div id="pilih-ikon" class="pilih-ikon"></div>
-      <div class="label-kecil">Warna</div>
-      <div id="pilih-warna" class="pilih-warna"></div>
+      <div class="medan"><span>Warna</span>
+        <div id="pilih-warna" class="pilih-warna" role="radiogroup" aria-label="Warna profil"></div>
+      </div>
       <div id="bahagian-pin-profil">
-        <label>PIN 4 digit (pilihan)
+        <label class="medan"><span>PIN 4 digit <em class="pudar">(pilihan)</em></span>
           <input name="pin" inputmode="numeric" pattern="\d{4}" maxlength="4" autocomplete="off" placeholder="Kosongkan kalau tak nak kunci">
         </label>
-        <p class="pudar kecil">Profil tanpa PIN boleh dibuka sesiapa yang ada link website ni.</p>
+        <p class="nota">Profil tanpa PIN boleh dibuka oleh sesiapa yang ada link website ni.</p>
       </div>
-      <p id="ralat-profil" class="ralat" hidden></p>
+      <p id="ralat-profil" class="ralat" role="alert" hidden></p>
       <div class="dialog-kaki">
-        <button type="button" id="btn-padam-profil" class="btn bahaya kiri" hidden>🗑️ Padam profil</button>
-        <button type="button" class="btn" data-tutup>Batal</button>
-        <button type="submit" id="btn-simpan-profil" class="btn utama">Tambah</button>
+        <button type="button" id="btn-padam-profil" class="btn btn-bahaya kiri" hidden><svg class="ik" data-ikon="sampah"></svg><span>Padam</span></button>
+        <button type="button" class="btn btn-garis" data-tutup>Batal</button>
+        <button type="submit" id="btn-simpan-profil" class="btn btn-utama">Tambah</button>
       </div>
     </form>
   </dialog>
 
   <!-- Dialog PIN -->
-  <dialog id="dialog-pin">
+  <dialog id="dialog-pin" class="dialog-kecil" aria-labelledby="pin-tajuk">
     <form id="borang-pin" method="dialog">
       <div class="dialog-kepala">
         <h2 id="pin-tajuk">Masukkan PIN</h2>
-        <button type="button" class="btn ikon" data-tutup aria-label="Tutup">✕</button>
+        <button type="button" class="btn-ikon" data-tutup aria-label="Tutup"><svg class="ik" data-ikon="tutup"></svg></button>
       </div>
-      <p id="pin-teks" class="pudar"></p>
-      <input name="pin" class="input-pin" type="password" inputmode="numeric" pattern="\d{4}" maxlength="4" required autocomplete="off" aria-label="PIN">
-      <p id="ralat-pin" class="ralat" hidden></p>
+      <p id="pin-teks" class="nota"></p>
+      <input name="pin" class="input-pin" type="password" inputmode="numeric" pattern="\d{4}" maxlength="4" required autocomplete="off" aria-label="PIN 4 digit">
+      <p id="ralat-pin" class="ralat tengah" role="alert" hidden></p>
       <div class="dialog-kaki">
-        <button type="button" class="btn" data-tutup>Batal</button>
-        <button type="submit" id="btn-pin-ok" class="btn utama">OK</button>
+        <button type="button" class="btn btn-garis" data-tutup>Batal</button>
+        <button type="submit" id="btn-pin-ok" class="btn btn-utama">Teruskan</button>
       </div>
     </form>
   </dialog>
 
   <!-- Dialog latar belakang -->
-  <dialog id="dialog-latar">
+  <dialog id="dialog-latar" aria-labelledby="tajuk-latar">
     <form id="borang-latar" method="dialog">
       <div class="dialog-kepala">
-        <h2>Latar Belakang</h2>
-        <button type="button" class="btn ikon" data-tutup aria-label="Tutup">✕</button>
+        <h2 id="tajuk-latar">Latar belakang</h2>
+        <button type="button" class="btn-ikon" data-tutup aria-label="Tutup"><svg class="ik" data-ikon="tutup"></svg></button>
       </div>
-      <div id="pratonton-latar" class="pratonton-latar lalai"><span>✨ Galaksi 3D (lalai)</span></div>
+      <div id="pratonton-latar" class="pratonton-latar lalai"><span>Latar lalai</span></div>
       <div class="pilihan-latar">
-        <button type="button" id="btn-pilih-latar" class="btn">🖼️ Upload gambar</button>
-        <button type="button" id="btn-lalai-latar" class="btn">✨ Guna galaksi 3D</button>
+        <button type="button" id="btn-pilih-latar" class="btn btn-garis"><svg class="ik" data-ikon="gambar"></svg><span>Upload gambar</span></button>
+        <button type="button" id="btn-lalai-latar" class="btn btn-teks">Guna latar lalai</button>
         <input id="input-latar" type="file" accept="image/*" hidden>
       </div>
-      <p class="pudar kecil">Gambar disimpan sehingga resolusi 4K (3840px). Latar ni hanya untuk profil ini.</p>
-      <p id="ralat-latar" class="ralat" hidden></p>
+      <p class="nota">Gambar disimpan sehingga resolusi 4K (3840px) dan hanya digunakan untuk profil ini.</p>
+      <p id="ralat-latar" class="ralat" role="alert" hidden></p>
       <div class="dialog-kaki">
-        <button type="button" class="btn" data-tutup>Batal</button>
-        <button type="submit" id="btn-simpan-latar" class="btn utama">Simpan</button>
+        <button type="button" class="btn btn-garis" data-tutup>Batal</button>
+        <button type="submit" id="btn-simpan-latar" class="btn btn-utama">Simpan</button>
       </div>
     </form>
   </dialog>
 
   <datalist id="senarai-folder"></datalist>
-  <div id="toast" class="toast" hidden></div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
