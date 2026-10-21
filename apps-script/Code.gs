@@ -16,6 +16,9 @@ const MAKS_PROFIL = 10;
 const MAKS_CUBA_PIN = 5;
 const KUNCI_SAAT = 300;        // kunci profil 5 minit selepas terlalu banyak PIN salah
 const SESI_SAAT = 6 * 60 * 60; // token sesi tamat selepas 6 jam
+const NAMA_FOLDER_GAMBAR = '_gambar-profil';
+const MAKS_GAMBAR_PROFIL = 300 * 1024;   // gambar profil dikecilkan di browser, biasanya < 50KB
+const MAKS_GAMBAR_PENUH = 3 * 1024 * 1024; // had gambar penuh sebagai ganti thumbnail
 
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('Index')
@@ -87,7 +90,52 @@ function simpanProfil_(list) {
 }
 
 function awam_(p) {
-  return { id: p.id, nama: p.nama, ikon: p.ikon, warna: p.warna, adaPin: !!p.pin };
+  return { id: p.id, nama: p.nama, ikon: p.ikon, warna: p.warna, adaPin: !!p.pin, gambar: p.gambarId ? dataGambar_(p.gambarId) : '' };
+}
+
+// ---------- Gambar profil (disimpan dalam UPSI-DATA/_gambar-profil) ----------
+
+function folderGambar_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('GAMBAR_ID');
+  if (id) {
+    try {
+      const f = DriveApp.getFolderById(id);
+      if (!f.isTrashed()) return f;
+    } catch (e) { /* buat semula */ }
+  }
+  const f = akar_().createFolder(NAMA_FOLDER_GAMBAR);
+  props.setProperty('GAMBAR_ID', f.getId());
+  return f;
+}
+
+// dataUrl: 'data:image/jpeg;base64,...' (sudah dikecilkan di browser)
+function simpanGambar_(dataUrl, nama) {
+  const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl || ''));
+  if (!m) throw new Error('Gambar tidak sah.');
+  const bytes = Utilities.base64Decode(m[2]);
+  if (bytes.length > MAKS_GAMBAR_PROFIL) throw new Error('Gambar profil terlalu besar.');
+  return folderGambar_().createFile(Utilities.newBlob(bytes, m[1], nama)).getId();
+}
+
+function dataGambar_(id) {
+  const kunci = 'gb_' + id;
+  const ada = cache_().get(kunci);
+  if (ada) return ada;
+  try {
+    const blob = DriveApp.getFileById(id).getBlob();
+    const data = 'data:' + blob.getContentType() + ';base64,' + Utilities.base64Encode(blob.getBytes());
+    if (data.length < 100000) cache_().put(kunci, data, SESI_SAAT);
+    return data;
+  } catch (e) {
+    return '';
+  }
+}
+
+function buangGambar_(id) {
+  if (!id) return;
+  try { DriveApp.getFileById(id).setTrashed(true); } catch (e) { /* dah tiada */ }
+  cache_().remove('gb_' + id);
 }
 
 function cariProfil_(id) {
@@ -117,7 +165,7 @@ function senaraiProfil() {
   return profilSemua_().filter(folderProfilWujud_).map(awam_);
 }
 
-function tambahProfil(nama, ikon, warna, pin) {
+function tambahProfil(nama, ikon, warna, pin, gambar) {
   nama = namaBersih_(nama).slice(0, 30);
   pin = String(pin || '');
   if (pin && !/^\d{4}$/.test(pin)) throw new Error('PIN mesti 4 digit nombor.');
@@ -132,8 +180,45 @@ function tambahProfil(nama, ikon, warna, pin) {
     if (list.some(function (p) { return p.nama.toLowerCase() === nama.toLowerCase(); })) throw new Error('Nama profil tu dah wujud.');
     const folder = akar_().createFolder(nama);
     const salt = Utilities.getUuid();
-    const p = { id: folder.getId(), nama: nama, ikon: ikon, warna: warna, salt: salt, pin: pin ? hash_(salt + ':' + pin) : '' };
+    const p = { id: folder.getId(), nama: nama, ikon: ikon, warna: warna, salt: salt, pin: pin ? hash_(salt + ':' + pin) : '', gambarId: '' };
+    if (gambar) p.gambarId = simpanGambar_(gambar, p.id + '.jpg');
     list.push(p);
+    simpanProfil_(list);
+    return awam_(p);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Semak PIN sebelum buka skrin edit profil
+function sahPin(id, pin) {
+  semakPin_(cariProfil_(id), pin);
+  return true;
+}
+
+// data: { nama, ikon, warna, gambar } — gambar: undefined = kekal, '' = buang, dataUrl = baru
+function kemasProfil(id, pin, data) {
+  data = data || {};
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const list = profilSemua_();
+    const p = list.filter(function (x) { return x.id === id; })[0];
+    if (!p) throw new Error('Profil tidak dijumpai.');
+    semakPin_(p, pin);
+    if (data.nama != null) {
+      const nama = namaBersih_(data.nama).slice(0, 30);
+      if (list.some(function (x) { return x.id !== id && x.nama.toLowerCase() === nama.toLowerCase(); })) throw new Error('Nama profil tu dah wujud.');
+      p.nama = nama;
+      try { DriveApp.getFolderById(id).setName(nama); } catch (e) { /* folder tetap dikenal pasti ikut ID */ }
+    }
+    if (data.ikon != null) p.ikon = String(data.ikon).slice(0, 8);
+    if (data.warna != null && /^#[0-9a-f]{6}$/i.test(data.warna)) p.warna = data.warna;
+    if (data.gambar !== undefined && data.gambar !== null) {
+      const lama = p.gambarId;
+      p.gambarId = data.gambar ? simpanGambar_(data.gambar, p.id + '.jpg') : '';
+      buangGambar_(lama);
+    }
     simpanProfil_(list);
     return awam_(p);
   } finally {
@@ -157,6 +242,7 @@ function padamProfil(id, pin) {
     const p = cariProfil_(id);
     semakPin_(p, pin);
     try { DriveApp.getFolderById(p.id).setTrashed(true); } catch (e) { /* folder dah tiada */ }
+    buangGambar_(p.gambarId);
     simpanProfil_(profilSemua_().filter(function (x) { return x.id !== id; }));
   } finally {
     lock.releaseLock();
@@ -300,6 +386,16 @@ function eksportPdf(token, id) {
   const f = failDalam_(asas, id);
   const res = api_('get', DRIVE_API + '/' + encodeURIComponent(id) + '/export?mimeType=application%2Fpdf');
   return { b64: Utilities.base64Encode(res.getContent()), nama: f.getName() + '.pdf' };
+}
+
+// Gambar kecil untuk pratonton bila thumbnailLink Google tidak boleh dimuat
+function gambarKecil(token, id) {
+  const f = failDalam_(profil_(token), id);
+  let blob = null;
+  try { blob = f.getThumbnail(); } catch (e) { /* tiada thumbnail */ }
+  if (!blob && /^image\//.test(f.getMimeType()) && f.getSize() <= MAKS_GAMBAR_PENUH) blob = f.getBlob();
+  if (!blob) return '';
+  return 'data:' + (blob.getContentType() || 'image/png') + ';base64,' + Utilities.base64Encode(blob.getBytes());
 }
 
 // ---------- Fail ----------
