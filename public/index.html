@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>UPSI-DATA</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Skrin: belum setup -->
+  <section id="skrin-setup" class="skrin tengah" hidden>
+    <div class="kotak">
+      <h1>📚 UPSI-DATA</h1>
+      <p>Website belum disambung ke Supabase.</p>
+      <p>Isi <code>SUPABASE_URL</code> dan <code>SUPABASE_ANON_KEY</code> dalam fail <code>public/js/config.js</code>, kemudian muat semula. Rujuk <code>README.md</code> untuk langkah penuh.</p>
+    </div>
+  </section>
+
+  <!-- Skrin: log masuk -->
+  <section id="skrin-login" class="skrin tengah" hidden>
+    <form id="borang-login" class="kotak">
+      <h1>📚 UPSI-DATA</h1>
+      <p class="pudar">Log masuk untuk akses tugasan kau.</p>
+      <label>Emel
+        <input type="email" name="emel" autocomplete="username" required>
+      </label>
+      <label>Kata laluan
+        <input type="password" name="katalaluan" autocomplete="current-password" required>
+      </label>
+      <p id="ralat-login" class="ralat" hidden></p>
+      <button type="submit" class="btn utama penuh">Log Masuk</button>
+    </form>
+  </section>
+
+  <!-- Skrin: utama -->
+  <section id="skrin-utama" class="skrin" hidden>
+    <header class="atas">
+      <div class="jenama">📚 UPSI-DATA</div>
+      <div class="pengguna">
+        <span id="emel-pengguna" class="pudar"></span>
+        <button id="btn-keluar" class="btn">Log Keluar</button>
+      </div>
+    </header>
+
+    <main class="isi">
+      <div class="statistik" id="statistik"></div>
+
+      <div class="alat">
+        <input id="cari" type="search" placeholder="Cari tajuk, kursus, pensyarah, tag…">
+        <select id="tapis-semester"><option value="">Semua semester</option></select>
+        <select id="tapis-status">
+          <option value="">Semua status</option>
+          <option>Belum Mula</option>
+          <option>Dalam Proses</option>
+          <option>Siap</option>
+          <option>Dihantar</option>
+        </select>
+        <select id="susun">
+          <option value="tarikh">Ikut tarikh hantar</option>
+          <option value="baru">Terbaru ditambah</option>
+          <option value="kursus">Ikut kod kursus</option>
+        </select>
+        <button id="btn-tambah" class="btn utama">+ Tugasan Baru</button>
+      </div>
+
+      <div id="senarai" class="senarai"></div>
+      <p id="kosong" class="kosong" hidden>Tiada tugasan lagi. Tekan <b>+ Tugasan Baru</b> untuk mula.</p>
+    </main>
+  </section>
+
+  <!-- Borang tambah / edit -->
+  <dialog id="dialog-borang">
+    <form id="borang" method="dialog">
+      <div class="dialog-kepala">
+        <h2 id="tajuk-borang">Tugasan Baru</h2>
+        <button type="button" class="btn ikon" data-tutup aria-label="Tutup">✕</button>
+      </div>
+
+      <div class="grid">
+        <label class="lebar">Tajuk tugasan *
+          <input name="tajuk" required placeholder="cth: Esei Kritikan Sastera">
+        </label>
+        <label>Kod kursus
+          <input name="kod_kursus" placeholder="cth: BMS3013">
+        </label>
+        <label>Nama kursus
+          <input name="nama_kursus" placeholder="cth: Kesusasteraan Melayu">
+        </label>
+        <label>Semester
+          <input name="semester" list="senarai-semester" placeholder="cth: Sem 3 2025/2026">
+          <datalist id="senarai-semester"></datalist>
+        </label>
+        <label>Jenis
+          <input name="jenis" list="senarai-jenis" placeholder="cth: Individu">
+          <datalist id="senarai-jenis">
+            <option>Individu</option><option>Berkumpulan</option><option>Kuiz</option>
+            <option>Projek</option><option>Pembentangan</option><option>Laporan</option><option>Peperiksaan</option>
+          </datalist>
+        </label>
+        <label>Pensyarah
+          <input name="pensyarah">
+        </label>
+        <label>Tarikh hantar
+          <input name="tarikh_hantar" type="date">
+        </label>
+        <label>Status
+          <select name="status">
+            <option>Belum Mula</option>
+            <option>Dalam Proses</option>
+            <option>Siap</option>
+            <option>Dihantar</option>
+          </select>
+        </label>
+        <label>Markah / Gred
+          <input name="markah" placeholder="cth: 18/20 atau A-">
+        </label>
+        <label class="lebar">Tag (asingkan dengan koma)
+          <input name="tag" placeholder="cth: penting, final">
+        </label>
+        <label class="lebar">Nota
+          <textarea name="nota" rows="3"></textarea>
+        </label>
+      </div>
+
+      <div class="fail-bahagian">
+        <div class="label">Fail</div>
+        <ul id="fail-sedia" class="fail-senarai"></ul>
+        <label id="zon-lepas" class="zon-lepas">
+          <input id="input-fail" type="file" multiple hidden>
+          <span>Seret fail ke sini atau <u>pilih fail</u></span>
+          <small class="pudar">PDF, Word, slide, gambar, zip… (maks 50MB setiap fail)</small>
+        </label>
+      </div>
+
+      <p id="ralat-borang" class="ralat" hidden></p>
+
+      <div class="dialog-kaki">
+        <button type="button" class="btn" data-tutup>Batal</button>
+        <button type="submit" id="btn-simpan" class="btn utama">Simpan</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
