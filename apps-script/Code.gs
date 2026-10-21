@@ -19,6 +19,7 @@ const SESI_SAAT = 6 * 60 * 60; // token sesi tamat selepas 6 jam
 const NAMA_FOLDER_GAMBAR = '_gambar-profil';
 const MAKS_GAMBAR_PROFIL = 300 * 1024;   // gambar profil dikecilkan di browser, biasanya < 50KB
 const MAKS_GAMBAR_PENUH = 3 * 1024 * 1024; // had gambar penuh sebagai ganti thumbnail
+const MAKS_LATAR = 5 * 1024 * 1024;        // gambar latar (sehingga 3840px / 4K, dimampatkan di browser)
 
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('Index')
@@ -118,6 +119,7 @@ function awam_(p) {
     id: p.id, nama: p.nama, ikon: p.ikon, warna: p.warna, adaPin: !!p.pin,
     gambar: p.gambarId ? dataGambar_(p.gambarId) : '',
     dibuatOleh: p.dibuatOleh || '', dibuatPada: p.dibuatPada || '',
+    latarId: p.latarId || '',
   };
 }
 
@@ -138,11 +140,11 @@ function folderGambar_() {
 }
 
 // dataUrl: 'data:image/jpeg;base64,...' (sudah dikecilkan di browser)
-function simpanGambar_(dataUrl, nama) {
+function simpanGambar_(dataUrl, nama, maks) {
   const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl || ''));
   if (!m) throw new Error('Gambar tidak sah.');
   const bytes = Utilities.base64Decode(m[2]);
-  if (bytes.length > MAKS_GAMBAR_PROFIL) throw new Error('Gambar profil terlalu besar.');
+  if (bytes.length > (maks || MAKS_GAMBAR_PROFIL)) throw new Error('Gambar terlalu besar.');
   return folderGambar_().createFile(Utilities.newBlob(bytes, m[1], nama)).getId();
 }
 
@@ -276,6 +278,7 @@ function padamProfil(id, pin) {
     semakPin_(p, pin);
     try { DriveApp.getFolderById(p.id).setTrashed(true); } catch (e) { /* folder dah tiada */ }
     buangGambar_(p.gambarId);
+    buangGambar_(p.latarId);
     simpanProfil_(profilSemua_().filter(function (x) { return x.id !== id; }));
   } finally {
     lock.releaseLock();
@@ -288,6 +291,39 @@ function profil_(token) {
   if (!id) throw new Error('SESI_TAMAT');
   if (!profilSemua_().some(function (p) { return p.id === id; })) throw new Error('SESI_TAMAT');
   return DriveApp.getFolderById(id);
+}
+
+// ---------- Latar belakang profil ----------
+
+// Gambar latar sendiri untuk profil token ini. '' = guna latar 3D lalai
+function tukarLatar(token, dataUrl) {
+  const asas = profil_(token);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const list = profilSemua_();
+    const p = list.filter(function (x) { return x.id === asas.getId(); })[0];
+    if (!p) throw new Error('SESI_TAMAT');
+    const lama = p.latarId;
+    p.latarId = dataUrl ? simpanGambar_(dataUrl, p.id + '-latar.jpg', MAKS_LATAR) : '';
+    simpanProfil_(list);
+    buangGambar_(lama);
+    return { latarId: p.latarId || '' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function latarProfil(token) {
+  const asas = profil_(token);
+  const p = profilSemua_().filter(function (x) { return x.id === asas.getId(); })[0];
+  if (!p || !p.latarId) return '';
+  try {
+    const blob = DriveApp.getFileById(p.latarId).getBlob();
+    return 'data:' + blob.getContentType() + ';base64,' + Utilities.base64Encode(blob.getBytes());
+  } catch (e) {
+    return '';
+  }
 }
 
 // Pastikan fail/folder berada dalam folder profil (terus, atau dalam subfolder satu peringkat)

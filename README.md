@@ -8,7 +8,9 @@ Storan fail peribadi, macam Google Drive versi ringkas. Upload fail kerja atau f
 - **Folder**: buat folder sendiri (cth. Kerja, Peribadi). Tukar nama atau padam folder.
 - **Urus fail**: buka, muat turun, tukar nama, pindah ke folder lain, padam.
 - **Pratonton gambar**, carian nama fail, dan susun ikut terbaru, nama atau saiz.
-- Bahasa Melayu, sesuai untuk telefon dan desktop, ada mod gelap.
+- Bahasa Melayu, sesuai untuk telefon dan desktop.
+- **Animasi 3D** (versi Google Drive): latar galaksi 3D yang berputar (canvas, tajam di skrin 4K/Retina, bergerak ikut tetikus/kecondongan telefon), kad kaca yang condong 3D, peralihan profil gaya Netflix, kad masuk berperingkat, konfeti bila upload berjaya.
+- **Latar belakang sendiri**: setiap profil boleh upload gambar latar (sehingga 4K / 3840px) melalui butang 🎨. Tanpa gambar, galaksi 3D lalai digunakan.
 
 Ada dua versi:
 
@@ -32,8 +34,22 @@ UPSI-DATA/
       laporan.pdf
   Sara/
     ...
-  _gambar-profil/  ← gambar profil (dikecilkan ke 256px)
+  _gambar-profil/  ← gambar profil (256px) dan latar belakang profil (sehingga 3840px)
 ```
+
+### Kod sumber
+`Index.html` **dijana** daripada `apps-script/src/` (`body.html`, `gaya.css`, `app.js`). Untuk ubah rupa atau fungsi, edit fail dalam `src/`, kemudian jalankan:
+
+```bash
+python3 apps-script/bina.py
+```
+
+Tampal `Index.html` yang baru ke Apps Script seperti biasa.
+
+### Animasi & prestasi
+- Galaksi dilukis dalam `<canvas>` ikut `devicePixelRatio` (tajam pada skrin 4K) dan berhenti bila tab tersorok.
+- Kualiti adaptif: kalau peranti tak mampu ~40fps, jumlah bintang dan resolusi diturunkan secara automatik.
+- Pengguna yang set *Kurangkan gerakan* (prefers-reduced-motion) dapat paparan statik tanpa animasi.
 
 Bila website dibuka, skrin **"Siapa yang guna?"** keluar dan kau pilih profil. Setiap profil hanya nampak fail sendiri. Tekan **Tambah Profil** untuk buat profil baru (nama, gambar atau ikon, warna, PIN pilihan). Tekan **Urus Profil** dan pilih profil untuk tukar nama/gambar atau padam profil (perlu PIN kalau profil berkunci).
 
