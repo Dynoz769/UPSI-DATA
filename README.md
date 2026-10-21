@@ -9,8 +9,9 @@ Storan fail peribadi, macam Google Drive versi ringkas. Upload fail kerja atau f
 - **Urus fail**: buka, muat turun, tukar nama, pindah ke folder lain, padam.
 - **Pratonton gambar**, carian nama fail, dan susun ikut terbaru, nama atau saiz.
 - Bahasa Melayu, sesuai untuk telefon dan desktop.
-- **Animasi 3D** (versi Google Drive): latar galaksi 3D yang berputar (canvas, tajam di skrin 4K/Retina, bergerak ikut tetikus/kecondongan telefon), kad kaca yang condong 3D, peralihan profil gaya Netflix, kad masuk berperingkat, konfeti bila upload berjaya.
-- **Latar belakang sendiri**: setiap profil boleh upload gambar latar (sehingga 4K / 3840px) melalui butang 🎨. Tanpa gambar, galaksi 3D lalai digunakan.
+- **Reka bentuk profesional & ringan** (versi Google Drive): ikon SVG, lencana jenis fail (PDF, DOC, XLS…), paparan **Grid / Senarai**, menu ⋯ untuk setiap fail dan folder, butang **+ Baru**, laluan navigasi, mod cerah/gelap ikut peranti.
+- **Animasi halus**: peralihan skrin, kad masuk berperingkat, menu & dialog buka/tutup beranimasi, status upload setiap fail, rangka semasa memuat. Hanya guna `transform`/`opacity` supaya ringan.
+- **Latar belakang sendiri**: setiap profil boleh upload gambar latar (sehingga 4K / 3840px) melalui menu profil → *Latar belakang*.
 
 Ada dua versi:
 
@@ -46,12 +47,13 @@ python3 apps-script/bina.py
 
 Tampal `Index.html` yang baru ke Apps Script seperti biasa.
 
-### Animasi & prestasi
-- Galaksi dilukis dalam `<canvas>` ikut `devicePixelRatio` (tajam pada skrin 4K) dan berhenti bila tab tersorok.
-- Kualiti adaptif: kalau peranti tak mampu ~40fps, jumlah bintang dan resolusi diturunkan secara automatik.
-- Pengguna yang set *Kurangkan gerakan* (prefers-reduced-motion) dapat paparan statik tanpa animasi.
+### Keserasian peranti
+- Telefon kecil (320px) hingga skrin 4K; menu jadi helaian bawah di telefon; sasaran sentuh ≥ 40px; input 16px (elak zum iOS); kawasan notch iPhone (`safe-area-inset`).
+- Mod cerah/gelap ikut tetapan peranti.
+- Pelayar tanpa `<dialog>` atau `backdrop-filter` tetap berfungsi (ada fallback).
+- Pengguna yang set *Kurangkan gerakan* (prefers-reduced-motion) dapat paparan tanpa animasi.
 
-Bila website dibuka, skrin **"Siapa yang guna?"** keluar dan kau pilih profil. Setiap profil hanya nampak fail sendiri. Tekan **Tambah Profil** untuk buat profil baru (nama, gambar atau ikon, warna, PIN pilihan). Tekan **Urus Profil** dan pilih profil untuk tukar nama/gambar atau padam profil (perlu PIN kalau profil berkunci).
+Bila website dibuka, skrin **"Siapa yang guna?"** keluar dan kau pilih profil. Setiap profil hanya nampak fail sendiri. Tekan **Tambah profil** untuk buat profil baru (nama, foto pilihan, warna, PIN pilihan). Tekan **Urus Profil** dan pilih profil untuk tukar nama/gambar atau padam profil (perlu PIN kalau profil berkunci).
 
 **Upload Folder**: folder yang dipilih atau diseret jadi folder dengan nama sama dalam profil. Subfolder diratakan, cth. `hari2/hutan.png` jadi `hari2 - hutan.png`.
 

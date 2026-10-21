@@ -1,290 +1,77 @@
 (() => {
   'use strict';
 
-  const CEBISAN_UP = 8 * 1024 * 1024;   // saiz cebisan upload (gandaan 256KB)
+  const CEBISAN_UP = 8 * 1024 * 1024;    // saiz cebisan upload (gandaan 256KB)
   const CEBISAN_TURUN = 4 * 1024 * 1024; // saiz cebisan muat turun
   const FOLDER_CADANGAN = ['Kerja', 'Peribadi', 'Dokumen', 'Gambar', 'Sijil', 'Nota'];
-  const IKON_PROFIL = ['🙂', '😎', '🤓', '🦊', '🐱', '🐼', '🐯', '🦁', '🐸', '🐧', '🌸', '⭐', '🚀', '🎮', '📚', '💼'];
-  const WARNA_PROFIL = ['#e50914', '#3b4fd8', '#1d8a4e', '#d97706', '#9333ea', '#0891b2', '#db2777', '#475569'];
+  const WARNA_PROFIL = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6', '#64748b'];
 
   const $ = (s, el = document) => el.querySelector(s);
   const tidur = (ms) => new Promise((ok) => setTimeout(ok, ms));
-  const bolehGerak = !matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const adaHover = matchMedia('(hover: hover) and (pointer: fine)').matches;
+  const bolehGerak = !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const simpanTempatan = (k, v) => { try { localStorage.setItem(k, v); } catch { /* storan disekat */ } };
+  const bacaTempatan = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
 
-  // ---------- Galaksi 3D (canvas) ----------
-  // Bintang dalam lengan lingkaran + sfera latar, diputar dalam 3D dan diunjur dengan perspektif.
-  // Dilukis ikut devicePixelRatio supaya tajam di skrin 4K/Retina. Berhenti bila tab tersorok.
-  const Galaksi = (() => {
-    const kanvas = document.getElementById('latar-3d');
-    const ctx = kanvas.getContext('2d');
-    const WARNA = ['#a78bfa', '#60a5fa', '#22d3ee', '#f472b6', '#ffffff'];
-    const sprite = WARNA.map((w) => {
-      const n = 64;
-      const c = document.createElement('canvas');
-      c.width = c.height = n;
-      const g = c.getContext('2d');
-      const gr = g.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2);
-      gr.addColorStop(0, 'rgba(255,255,255,1)');
-      gr.addColorStop(0.12, w);
-      gr.addColorStop(0.4, `${w}55`);
-      gr.addColorStop(1, `${w}00`);
-      g.fillStyle = gr;
-      g.fillRect(0, 0, n, n);
-      return c;
-    });
-    let w = 0;
-    let h = 0;
-    let bintang = [];
-    let meteor = [];
-    let jalan = false;
-    let intensiti = 1;
-    let mula = performance.now();
-    // Kualiti adaptif: turunkan bintang/resolusi kalau peranti tak mampu ~40fps
-    let kualiti = 1;
-    let bingkai = 0;
-    let masaBingkai = 0;
-    let akhir = 0;
-    const sasaran = { x: 0, y: 0 };
-    const semasa = { x: 0, y: 0 };
-
-    function jana() {
-      const n = Math.round(Math.min(1500, Math.max(380, (w * h) / 1300)) * kualiti);
-      bintang = [];
-      for (let i = 0; i < n; i++) {
-        if (i < n * 0.78) {
-          const lengan = i % 3;
-          const r = Math.pow(Math.random(), 0.65);
-          const sudut = r * 5.6 + lengan * ((Math.PI * 2) / 3) + (Math.random() - 0.5) * 0.7 * (1 - r * 0.4);
-          const sebar = (Math.random() - 0.5) * 0.12 * (1 - r);
-          bintang.push({
-            x: Math.cos(sudut) * r + sebar, y: (Math.random() - 0.5) * 0.16 * (1.15 - r), z: Math.sin(sudut) * r + sebar,
-            s: 0.55 + Math.random() * 1.5, w: r < 0.22 ? 4 : (lengan + (Math.random() < 0.25 ? 1 : 0)) % 4, k: Math.random() * 6.28,
-          });
-        } else {
-          const u = Math.random() * 2 - 1;
-          const th = Math.random() * Math.PI * 2;
-          const R = 1.7 + Math.random() * 1.6;
-          const q = Math.sqrt(1 - u * u);
-          bintang.push({ x: q * Math.cos(th) * R, y: u * R, z: q * Math.sin(th) * R, s: 0.35 + Math.random() * 0.8, w: Math.random() < 0.7 ? 4 : 1, k: Math.random() * 6.28 });
-        }
-      }
-    }
-
-    function saiz() {
-      const dpr = Math.min(window.devicePixelRatio || 1, kualiti < 1 ? 1.25 : 2.5);
-      w = innerWidth;
-      h = innerHeight;
-      kanvas.width = Math.round(w * dpr);
-      kanvas.height = Math.round(h * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      jana();
-    }
-
-    function lukis(masa) {
-      const t = (masa - mula) / 1000;
-      if (jalan && akhir && kualiti === 1) {
-        masaBingkai += masa - akhir;
-        if (++bingkai === 90) {
-          if (masaBingkai / bingkai > 25) { kualiti = 0.55; saiz(); }
-          bingkai = 0;
-          masaBingkai = 0;
-        }
-      }
-      akhir = masa;
-      semasa.x += (sasaran.x - semasa.x) * 0.045;
-      semasa.y += (sasaran.y - semasa.y) * 0.045;
-      ctx.clearRect(0, 0, w, h);
-      ctx.globalCompositeOperation = 'lighter';
-
-      const putar = t * 0.03 + semasa.x * 0.35;
-      const condong = 0.5 + semasa.y * 0.18;
-      const cy = Math.cos(putar);
-      const sy = Math.sin(putar);
-      const cx = Math.cos(condong);
-      const sx = Math.sin(condong);
-      const skala = Math.min(w, h) * 0.7;
-      const kamera = 2.4;
-      const ox = w * 0.5 + semasa.x * 30;
-      const oy = h * 0.52 + semasa.y * 20;
-
-      // cahaya teras galaksi
-      const teras = ctx.createRadialGradient(ox, oy, 0, ox, oy, skala * 0.45);
-      teras.addColorStop(0, `rgba(196,181,253,${0.32 * intensiti})`);
-      teras.addColorStop(0.35, `rgba(124,92,255,${0.12 * intensiti})`);
-      teras.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = teras;
-      ctx.fillRect(0, 0, w, h);
-
-      for (const b of bintang) {
-        const x = b.x * cy - b.z * sy;
-        const z = b.x * sy + b.z * cy;
-        const y2 = b.y * cx - z * sx;
-        const z2 = b.y * sx + z * cx;
-        const d = kamera + z2;
-        if (d < 0.15) continue;
-        const p = kamera / d;
-        const px = ox + x * p * skala;
-        const py = oy + y2 * p * skala;
-        if (px < -20 || py < -20 || px > w + 20 || py > h + 20) continue;
-        const kelip = 0.72 + 0.28 * Math.sin(t * 1.8 + b.k);
-        const sz = b.s * p * 2.4 * kelip;
-        ctx.globalAlpha = Math.min(1, (0.2 + p * 0.55) * intensiti);
-        ctx.drawImage(sprite[b.w], px - sz * 2, py - sz * 2, sz * 4, sz * 4);
-      }
-
-      // meteor sekali-sekala
-      if (bolehGerak && Math.random() < 0.006 && meteor.length < 2) {
-        meteor.push({ x: Math.random() * w, y: Math.random() * h * 0.4, vx: 9 + Math.random() * 7, vy: 3 + Math.random() * 3, hayat: 1 });
-      }
-      meteor = meteor.filter((m) => m.hayat > 0);
-      for (const m of meteor) {
-        m.x += m.vx;
-        m.y += m.vy;
-        m.hayat -= 0.018;
-        const g = ctx.createLinearGradient(m.x, m.y, m.x - m.vx * 12, m.y - m.vy * 12);
-        g.addColorStop(0, `rgba(255,255,255,${m.hayat * intensiti})`);
-        g.addColorStop(1, 'rgba(103,232,249,0)');
-        ctx.globalAlpha = 1;
-        ctx.strokeStyle = g;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(m.x, m.y);
-        ctx.lineTo(m.x - m.vx * 12, m.y - m.vy * 12);
-        ctx.stroke();
-      }
-      ctx.globalCompositeOperation = 'source-over';
-      if (jalan) requestAnimationFrame(lukis);
-    }
-
-    function mulakan() {
-      if (jalan) return;
-      jalan = bolehGerak;
-      requestAnimationFrame(lukis);
-    }
-
-    saiz();
-    let tundaSaiz;
-    addEventListener('resize', () => { clearTimeout(tundaSaiz); tundaSaiz = setTimeout(() => { saiz(); if (!jalan) requestAnimationFrame(lukis); }, 150); });
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) jalan = false;
-      else { akhir = 0; mulakan(); }
-    });
-
-    return {
-      mulakan,
-      intensiti(n) { intensiti = n; if (!jalan) requestAnimationFrame(lukis); },
-      arah(x, y) { sasaran.x = x; sasaran.y = y; },
-    };
-  })();
-
-  // Parallax: tetikus atau kecondongan telefon gerakkan galaksi dan gambar latar
-  const latarEl = document.getElementById('latar');
-  function gerakLatar(x, y) {
-    Galaksi.arah(x, y);
-    latarEl.style.setProperty('--px', x.toFixed(3));
-    latarEl.style.setProperty('--py', y.toFixed(3));
-  }
-  if (bolehGerak) {
-    addEventListener('pointermove', (ev) => gerakLatar((ev.clientX / innerWidth) * 2 - 1, (ev.clientY / innerHeight) * 2 - 1), { passive: true });
-    addEventListener('deviceorientation', (ev) => {
-      if (ev.gamma == null) return;
-      gerakLatar(Math.max(-1, Math.min(1, ev.gamma / 30)), Math.max(-1, Math.min(1, (ev.beta - 45) / 30)));
-    }, { passive: true });
-  }
-
-  // Kad condong 3D ikut tetikus, dengan kilauan cahaya di bawah kursor
-  let kadCondong = null;
-  const lepasCondong = (k) => { ['--rx', '--ry'].forEach((v) => k.style.removeProperty(v)); };
-  if (bolehGerak && adaHover) {
-    document.addEventListener('pointermove', (ev) => {
-      const k = ev.target.closest ? ev.target.closest('.kad:not(.rangka), .kad-profil') : null;
-      if (k !== kadCondong) {
-        if (kadCondong) lepasCondong(kadCondong);
-        kadCondong = k;
-      }
-      if (!k) return;
-      const r = k.getBoundingClientRect();
-      const x = (ev.clientX - r.left) / r.width;
-      const y = (ev.clientY - r.top) / r.height;
-      const kuat = k.classList.contains('kad-profil') ? 22 : 12;
-      k.style.setProperty('--rx', `${((0.5 - y) * kuat).toFixed(2)}deg`);
-      k.style.setProperty('--ry', `${((x - 0.5) * kuat).toFixed(2)}deg`);
-      const sasaranKilau = k.querySelector('.avatar') && k.classList.contains('kad-profil') ? k.querySelector('.avatar') : k;
-      sasaranKilau.style.setProperty('--mx', `${(x * 100).toFixed(1)}%`);
-      sasaranKilau.style.setProperty('--my', `${(y * 100).toFixed(1)}%`);
-    }, { passive: true });
-  }
-
-  // Kesan riak pada butang
-  document.addEventListener('pointerdown', (ev) => {
-    const b = ev.target.closest && ev.target.closest('.btn, .tab');
-    if (!b || !bolehGerak) return;
-    const r = b.getBoundingClientRect();
-    const d = Math.max(r.width, r.height) * 2.2;
-    const riak = document.createElement('span');
-    riak.className = 'riak';
-    riak.style.cssText = `width:${d}px;height:${d}px;left:${ev.clientX - r.left - d / 2}px;top:${ev.clientY - r.top - d / 2}px`;
-    b.append(riak);
-    setTimeout(() => riak.remove(), 700);
-  });
-
-  // Letupan konfeti dari satu titik
-  function letupan(x, y, n = 34) {
-    if (!bolehGerak) return;
-    const warna = ['#8b6cff', '#22d3ee', '#f472b6', '#facc15', '#3ee69a', '#ffffff'];
-    for (let i = 0; i < n; i++) {
-      const s = document.createElement('span');
-      s.className = 'serpih';
-      s.style.background = warna[i % warna.length];
-      if (i % 3 === 0) s.style.borderRadius = '50%';
-      document.body.append(s);
-      const sudut = Math.random() * Math.PI * 2;
-      const jarak = 80 + Math.random() * 160;
-      const dx = Math.cos(sudut) * jarak;
-      const dy = Math.sin(sudut) * jarak - 60;
-      s.animate([
-        { transform: `translate(${x}px, ${y}px) scale(1) rotate(0deg)`, opacity: 1 },
-        { transform: `translate(${x + dx}px, ${y + dy + 120}px) scale(.4) rotate(${Math.random() * 720 - 360}deg)`, opacity: 0 },
-      ], { duration: 900 + Math.random() * 600, easing: 'cubic-bezier(.2,.8,.3,1)' }).onfinish = () => s.remove();
-    }
-  }
-  const letupanDari = (elem) => {
-    if (!elem) return;
-    const r = elem.getBoundingClientRect();
-    letupan(r.left + r.width / 2, r.top + r.height / 2);
+  // ---------- Ikon SVG (gaya garis, 24x24) ----------
+  // 'c:x,y,r' = bulatan, 'r:x,y,w,h,rx' = segi empat, lain-lain = laluan
+  const IKON = {
+    cari: ['c:11,11,7', 'm20 20-4-4'],
+    tambah: ['M12 5v14', 'M5 12h14'],
+    bawah: ['m6 9 6 6 6-6'],
+    kanan: ['m9 6 6 6-6 6'],
+    rumah: ['M3 10.5 12 3l9 7.5', 'M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5'],
+    grid: ['r:3,3,7,7,1.5', 'r:14,3,7,7,1.5', 'r:3,14,7,7,1.5', 'r:14,14,7,7,1.5'],
+    senarai: ['M9 6h12', 'M9 12h12', 'M9 18h12', 'M4 6h.01', 'M4 12h.01', 'M4 18h.01'],
+    lagi: ['c:5,12,1.2', 'c:12,12,1.2', 'c:19,12,1.2'],
+    folder: ['M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z'],
+    folderBaru: ['M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z', 'M12 11v6', 'M9 14h6'],
+    pindah: ['M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z', 'M9 14h6', 'm13 11 3 3-3 3'],
+    fail: ['M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z', 'M14 3v5h5'],
+    upload: ['M12 15V4', 'm7 9 5-5 5 5', 'M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3'],
+    uploadFolder: ['M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z', 'M12 17v-6', 'm9 13 3-3 3 3'],
+    muatTurun: ['M12 4v11', 'm7 10 5 5 5-5', 'M5 19h14'],
+    buka: ['M14 4h6v6', 'M20 4 10 14', 'M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4'],
+    pensel: ['M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z'],
+    sampah: ['M4 7h16', 'M10 11v6', 'M14 11v6', 'M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12', 'M9 7V4h6v3'],
+    tutup: ['M18 6 6 18', 'm6 6 12 12'],
+    kunci: ['r:5,11,14,10,2', 'M8 11V8a4 4 0 0 1 8 0v3'],
+    gambar: ['r:3,3,18,18,2', 'c:9,9,2', 'm21 15-4-4L5 21'],
+    keluar: ['M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3', 'm10 16-4-4 4-4', 'M6 12h11'],
+    betul: ['M20 6 9 17l-5-5'],
+    amaran: ['c:12,12,9', 'M12 8v5', 'M12 16h.01'],
+    info: ['c:12,12,9', 'M12 11v5', 'M12 8h.01'],
+    awan: ['M7 18a5 5 0 1 1 .9-9.9A6 6 0 0 1 19 10a4 4 0 0 1-1 8', 'M12 12v8', 'm9 15 3-3 3 3'],
   };
-
-  let token = '';
-  let saya = { emel: '', id: '' }; // siapa yang sedang guna website ni
-  let profilAktif = null;  // { id, nama, ikon, warna, adaPin }
-  let profilList = [];
-  let modUrus = false;
-  let akarId = '';
-  let folders = [];        // { id, nama }
-  let semua = [];          // { id, nama, jenis, saiz, tarikh, folderId, thumb }
-  let folderAktif = '';    // id folder; '' = Semua
-  let failUpload = [];
-  let animasiSeterusnya = false; // mainkan animasi masuk kad pada paparan seterusnya
-
-  // Panggil fungsi dalam Code.gs
-  const panggilTerus = (fn, ...args) => new Promise((ok, gagal) => {
-    google.script.run.withSuccessHandler(ok).withFailureHandler(gagal)[fn](...args);
-  });
-
-  // Panggil fungsi fail dengan token; kalau sesi tamat, kembali ke skrin pilih profil
-  const panggil = async (fn, ...args) => {
-    try {
-      return await panggilTerus(fn, token, ...args);
-    } catch (e) {
-      if (/SESI_TAMAT/.test(e && e.message)) {
-        keluarProfil();
-        toast('Sesi tamat. Pilih profil semula.', true);
+  const NS = 'http://www.w3.org/2000/svg';
+  function lukisIkon(svg, nama) {
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    while (svg.firstChild) svg.firstChild.remove();
+    for (const s of IKON[nama] || []) {
+      let n;
+      if (s.startsWith('c:')) {
+        const [cx, cy, r] = s.slice(2).split(',');
+        n = document.createElementNS(NS, 'circle');
+        n.setAttribute('cx', cx); n.setAttribute('cy', cy); n.setAttribute('r', r);
+      } else if (s.startsWith('r:')) {
+        const [x, y, w, h, rx] = s.slice(2).split(',');
+        n = document.createElementNS(NS, 'rect');
+        n.setAttribute('x', x); n.setAttribute('y', y); n.setAttribute('width', w); n.setAttribute('height', h); n.setAttribute('rx', rx);
+      } else {
+        n = document.createElementNS(NS, 'path');
+        n.setAttribute('d', s);
       }
-      throw e;
+      svg.append(n);
     }
+    return svg;
+  }
+  const ikon = (nama, kelas = '') => {
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('class', `ik ${kelas}`.trim());
+    return lukisIkon(svg, nama);
   };
+  document.querySelectorAll('svg[data-ikon]').forEach((s) => lukisIkon(s, s.dataset.ikon));
 
   // ---------- Utiliti ----------
   const el = (tag, attrs = {}, ...anak) => {
@@ -298,13 +85,29 @@
     for (const a of anak.flat()) if (a != null && a !== false) n.append(a);
     return n;
   };
-
   // replaceChildren tanpa nilai kosong/false (untuk anak bersyarat)
   const isi = (node, ...anak) => node.replaceChildren(...anak.flat().filter((a) => a != null && a !== false));
 
-  const tunjuk = (id) => {
+  // Mainkan animasi CSS sekali (buang kelas bila tamat supaya boleh diulang)
+  function mainkan(elem, kelas) {
+    if (!elem || !bolehGerak) return;
+    elem.classList.remove(kelas);
+    void elem.offsetWidth;
+    elem.classList.add(kelas);
+    elem.addEventListener('animationend', () => elem.classList.remove(kelas), { once: true });
+  }
+
+  async function tukarSkrin(id) {
+    const kini = document.querySelector('.skrin:not([hidden])');
+    if (kini && kini.id !== id && bolehGerak) {
+      kini.classList.add('skrin-keluar');
+      await tidur(170);
+      kini.classList.remove('skrin-keluar');
+    }
     document.querySelectorAll('.skrin').forEach((s) => { s.hidden = s.id !== id; });
-  };
+    window.scrollTo(0, 0);
+    mainkan($(`#${id}`), 'skrin-masuk');
+  }
 
   const saiz = (b) => {
     if (b == null) return '';
@@ -321,23 +124,31 @@
   const sambungan = (nama) => (nama.includes('.') ? nama.split('.').pop().toLowerCase() : '');
   const isGoogleDoc = (f) => f.jenis.startsWith('application/vnd.google-apps.');
 
-  const ikonFail = (f) => {
+  function jenisFail(f) {
     const ext = sambungan(f.nama);
-    const j = f.jenis;
-    if (j.startsWith('image/')) return '🖼️';
-    if (ext === 'pdf' || j === 'application/pdf') return '📕';
-    if (j.endsWith('google-apps.document') || ['doc', 'docx', 'odt', 'rtf', 'txt', 'md'].includes(ext)) return '📝';
-    if (j.endsWith('google-apps.presentation') || ['ppt', 'pptx', 'key', 'odp'].includes(ext)) return '📊';
-    if (j.endsWith('google-apps.spreadsheet') || ['xls', 'xlsx', 'csv', 'ods'].includes(ext)) return '📈';
-    if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return '🗜️';
-    if (j.startsWith('video/')) return '🎬';
-    if (j.startsWith('audio/')) return '🎵';
-    return '📄';
+    const j = f.jenis || '';
+    if (j.startsWith('image/')) return ['img', 'IMG'];
+    if (ext === 'pdf' || j === 'application/pdf') return ['pdf', 'PDF'];
+    if (j.endsWith('google-apps.document') || ['doc', 'docx', 'odt', 'rtf'].includes(ext)) return ['doc', 'DOC'];
+    if (j.endsWith('google-apps.spreadsheet') || ['xls', 'xlsx', 'ods'].includes(ext)) return ['xls', 'XLS'];
+    if (ext === 'csv') return ['xls', 'CSV'];
+    if (j.endsWith('google-apps.presentation') || ['ppt', 'pptx', 'key', 'odp'].includes(ext)) return ['ppt', 'PPT'];
+    if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return ['zip', ext.toUpperCase().slice(0, 3)];
+    if (j.startsWith('video/')) return ['vid', 'VID'];
+    if (j.startsWith('audio/')) return ['aud', 'AUD'];
+    if (['txt', 'md'].includes(ext) || j.startsWith('text/')) return ['txt', 'TXT'];
+    return ['lain', (ext || 'fail').toUpperCase().slice(0, 4)];
+  }
+  const lencanaFail = (f) => {
+    const [k, label] = jenisFail(f);
+    return el('span', { class: `lencana-fail jenis-${k}` }, ikon('fail'), el('span', { class: 'lencana-label' }, label));
   };
 
+  // Huruf awal nama (sokong emoji / aksara berganda)
+  const inisial = (nama = '') => nama.trim().split(/\s+/).slice(0, 2).map((w) => Array.from(w)[0] || '').join('').toUpperCase() || '?';
   const avatar = (p, kelas = '') => (p.gambar
-    ? el('span', { class: `avatar ada-gambar ${kelas}`, style: `--c:${p.warna};background-color:${p.warna};background-image:url("${p.gambar}")`, role: 'img', 'aria-label': p.nama || 'Gambar profil' })
-    : el('span', { class: `avatar ${kelas}`, style: `--c:${p.warna};background:linear-gradient(145deg, ${p.warna}, ${p.warna}aa)` }, p.ikon));
+    ? el('span', { class: `avatar ada-gambar ${kelas}`, style: `--c:${p.warna};background-image:url("${p.gambar}")`, role: 'img', 'aria-label': p.nama || 'Foto profil' })
+    : el('span', { class: `avatar ${kelas}`, style: `--c:${p.warna}`, 'aria-hidden': 'true' }, inisial(p.nama)));
 
   // Email, atau "Tanpa nama #kod" untuk akaun yang Google tak dedahkan emelnya
   const labelOleh = (o) => {
@@ -345,29 +156,30 @@
     const m = /^tanpa-nama-(.+)$/.exec(o);
     return m ? `Tanpa nama #${m[1]}` : o;
   };
-  const olehSpan = (o) => o && el('span', { class: 'oleh', title: `Oleh ${labelOleh(o)}` }, `👤 ${labelOleh(o)}`);
 
-  async function kenalPasti() {
-    try { saya = await panggilTerus('siapaSaya'); } catch { /* biarkan kosong */ }
-    const teks = saya.emel
-      ? `Anda: ${saya.emel}`
-      : `Anda: ${labelOleh(saya.id) || 'tidak dikenal pasti'} (Google tak dedahkan email akaun ni)`;
-    $('#saya-profil').textContent = teks;
-    $('#saya-header').textContent = saya.emel || labelOleh(saya.id);
-    $('#saya-header').title = teks;
-  }
-
-  const namaFolder = (id) => (id === akarId ? 'Utama' : (folders.find((f) => f.id === id)?.nama || '?'));
-
+  // Toast: satu mesej pada satu masa; jenis 'ok' | 'ralat' | 'info' | 'muat'
   let toastTimer;
-  const toast = (msg, ralat = false, kekal = false) => {
+  let toastGiliran = 0;
+  function toast(msg, jenis = 'info', kekal = false) {
+    if (jenis === true) jenis = 'ralat';
     const t = $('#toast');
-    t.textContent = msg;
-    t.classList.toggle('ralat', ralat);
-    t.hidden = false;
+    const giliran = ++toastGiliran;
+    isi(t, jenis === 'muat' ? el('span', { class: 'pemusing' }) : ikon(jenis === 'ralat' ? 'amaran' : jenis === 'ok' ? 'betul' : 'info'), el('span', {}, msg));
+    t.className = `toast toast-${jenis}`;
+    if (t.hidden) {
+      t.hidden = false;
+      mainkan(t, 'toast-masuk');
+    }
     clearTimeout(toastTimer);
-    if (!kekal) toastTimer = setTimeout(() => { t.hidden = true; }, 4000);
-  };
+    if (!kekal) toastTimer = setTimeout(() => tutupToast(giliran), jenis === 'ralat' ? 5000 : 3000);
+  }
+  function tutupToast(giliran) {
+    const t = $('#toast');
+    if (t.hidden || (giliran && giliran !== toastGiliran)) return;
+    if (!bolehGerak) { t.hidden = true; return; }
+    t.classList.add('toast-keluar');
+    setTimeout(() => { if (!giliran || giliran === toastGiliran) t.hidden = true; t.classList.remove('toast-keluar'); }, 180);
+  }
 
   const mesejRalat = (e) => {
     const m = (e && e.message) || String(e);
@@ -376,12 +188,145 @@
     return m.replace(/^Exception:\s*/, '');
   };
 
+  // ---------- Keadaan ----------
+  let token = '';
+  let saya = { emel: '', id: '' };
+  let profilAktif = null;
+  let profilList = [];
+  let modUrus = false;
+  let akarId = '';
+  let folders = [];        // { id, nama, oleh }
+  let semua = [];          // { id, nama, jenis, saiz, tarikh, folderId, thumb, oleh }
+  let folderAktif = '';    // id folder; '' = halaman utama
+  let failUpload = [];
+  let animasiSeterusnya = false;
+  let modPaparan = bacaTempatan('upsi-paparan') === 'senarai' ? 'senarai' : 'grid';
+
+  // Panggil fungsi dalam Code.gs
+  const panggilTerus = (fn, ...args) => new Promise((ok, gagal) => {
+    google.script.run.withSuccessHandler(ok).withFailureHandler(gagal)[fn](...args);
+  });
+  // Panggil fungsi fail dengan token; kalau sesi tamat, kembali ke skrin pilih profil
+  const panggil = async (fn, ...args) => {
+    try {
+      return await panggilTerus(fn, token, ...args);
+    } catch (e) {
+      if (/SESI_TAMAT/.test(e && e.message) && token) {
+        keluarProfil();
+        toast('Sesi tamat. Pilih profil semula.', 'ralat');
+      }
+      throw e;
+    }
+  };
+
+  // ---------- Dialog (buka/tutup beranimasi, dengan sokongan pelayar lama) ----------
+  if (typeof HTMLDialogElement !== 'function' || !HTMLDialogElement.prototype.showModal) {
+    document.querySelectorAll('dialog').forEach((d) => {
+      d.showModal = () => { d.setAttribute('open', ''); document.documentElement.classList.add('ada-modal'); };
+      d.close = () => {
+        d.removeAttribute('open');
+        if (!document.querySelector('dialog[open]')) document.documentElement.classList.remove('ada-modal');
+        d.dispatchEvent(new Event('close'));
+      };
+      try { Object.defineProperty(d, 'open', { get: () => d.hasAttribute('open') }); } catch { /* abaikan */ }
+    });
+  }
+  function bukaDialog(d) {
+    tutupMenu(true);
+    if (!d.open) d.showModal();
+    const medan = d.querySelector('input:not([type=hidden]):not([hidden]), select');
+    if (medan && innerWidth > 720) setTimeout(() => medan.focus(), 30);
+  }
+  function tutupDialog(d) {
+    if (!d.open || d.classList.contains('menutup')) return;
+    if (d.dataset.sibuk) { toast('Tunggu sehingga upload selesai.', 'info'); return; }
+    if (!bolehGerak) { d.close(); return; }
+    d.classList.add('menutup');
+    setTimeout(() => { d.classList.remove('menutup'); d.close(); }, 150);
+  }
+  document.querySelectorAll('dialog').forEach((d) => {
+    d.addEventListener('cancel', (ev) => { ev.preventDefault(); tutupDialog(d); });
+    let mulaLuar = false;
+    d.addEventListener('pointerdown', (ev) => { mulaLuar = ev.target === d; });
+    d.addEventListener('click', (ev) => { if (mulaLuar && ev.target === d) tutupDialog(d); });
+  });
+  document.querySelectorAll('[data-tutup]').forEach((b) => b.addEventListener('click', () => tutupDialog(b.closest('dialog'))));
+
+  // ---------- Menu timbul (lungsur di desktop, helaian bawah di telefon) ----------
+  const menuEl = $('#menu');
+  let menuPencetus = null;
+  function bukaMenu(pencetus, items, tajuk) {
+    if (menuPencetus === pencetus && !menuEl.hidden) { tutupMenu(); return; }
+    tutupMenu(true);
+    menuPencetus = pencetus;
+    pencetus.setAttribute('aria-expanded', 'true');
+    isi(menuEl,
+      tajuk && el('div', { class: 'menu-tajuk' }, tajuk),
+      ...items.filter(Boolean).map((it) => (it === '-'
+        ? el('div', { class: 'menu-pemisah', role: 'separator' })
+        : el('button', {
+          type: 'button', role: 'menuitem', class: `menu-item ${it.bahaya ? 'bahaya' : ''}`,
+          onclick: () => { tutupMenu(true); it.tindakan(); },
+        }, ikon(it.ikon), el('span', {}, it.label)))));
+    const helaian = innerWidth < 600;
+    menuEl.classList.toggle('helaian', helaian);
+    menuEl.style.left = '';
+    menuEl.style.top = '';
+    menuEl.hidden = false;
+    $('#menu-latar').hidden = !helaian;
+    if (!helaian) {
+      const r = pencetus.getBoundingClientRect();
+      const m = menuEl.getBoundingClientRect();
+      const kiri = Math.min(innerWidth - m.width - 8, Math.max(8, r.right - m.width));
+      let atas = r.bottom + 6;
+      let asal = 'top';
+      if (atas + m.height > innerHeight - 8) { atas = Math.max(8, r.top - m.height - 6); asal = 'bottom'; }
+      menuEl.style.left = `${kiri}px`;
+      menuEl.style.top = `${atas}px`;
+      menuEl.style.transformOrigin = `${Math.round(r.left + r.width / 2 - kiri)}px ${asal}`;
+    }
+    mainkan(menuEl, 'menu-masuk');
+  }
+  function tutupMenu(segera) {
+    if (menuEl.hidden) return;
+    menuPencetus?.setAttribute('aria-expanded', 'false');
+    menuPencetus = null;
+    $('#menu-latar').hidden = true;
+    if (segera || !bolehGerak) { menuEl.hidden = true; return; }
+    menuEl.classList.add('menu-keluar');
+    setTimeout(() => { menuEl.hidden = true; menuEl.classList.remove('menu-keluar'); }, menuEl.classList.contains('helaian') ? 170 : 110);
+  }
+  document.addEventListener('pointerdown', (ev) => {
+    if (!menuEl.hidden && !menuEl.contains(ev.target) && !(menuPencetus && menuPencetus.contains(ev.target))) tutupMenu();
+  });
+  document.addEventListener('keydown', (ev) => {
+    if (menuEl.hidden) return;
+    if (ev.key === 'Escape') { const p = menuPencetus; tutupMenu(); p?.focus(); ev.preventDefault(); return; }
+    if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+      const item = [...menuEl.querySelectorAll('.menu-item')];
+      const i = item.indexOf(document.activeElement);
+      const j = ev.key === 'ArrowDown' ? (i + 1) % item.length : (i - 1 + item.length) % item.length;
+      item[j]?.focus();
+      ev.preventDefault();
+    }
+  });
+  addEventListener('resize', () => tutupMenu(true));
+  addEventListener('scroll', () => { if (!menuEl.classList.contains('helaian')) tutupMenu(true); }, { passive: true });
+
+  // ---------- Siapa pengguna ----------
+  async function kenalPasti() {
+    try { saya = await panggilTerus('siapaSaya'); } catch { /* biarkan kosong */ }
+    $('#saya-profil').textContent = saya.emel
+      ? `Log masuk sebagai ${saya.emel}`
+      : saya.id ? `Anda: ${labelOleh(saya.id)}` : '';
+  }
+
   // ---------- Profil ----------
   async function muatProfil() {
     try {
       profilList = await panggilTerus('senaraiProfil');
     } catch (e) {
-      $('#grid-profil').replaceChildren(el('p', { class: 'ralat' }, mesejRalat(e)));
+      isi($('#grid-profil'), el('p', { class: 'ralat' }, mesejRalat(e)));
       return;
     }
     if (!profilList.length) modUrus = false;
@@ -389,28 +334,32 @@
   }
 
   function paparProfil() {
-    $('#tajuk-profil').textContent = modUrus ? 'Urus Profil' : (profilList.length ? 'Siapa yang guna?' : 'Selamat datang! Buat profil pertama kau.');
+    $('#tajuk-profil').textContent = modUrus ? 'Urus profil' : profilList.length ? 'Siapa yang guna?' : 'Selamat datang';
+    $('#sub-profil').textContent = modUrus
+      ? 'Pilih profil untuk edit atau padam'
+      : profilList.length ? 'Pilih profil untuk teruskan' : 'Buat profil pertama untuk mula menyimpan fail';
     const btnUrus = $('#btn-urus-profil');
     btnUrus.hidden = !profilList.length;
-    btnUrus.textContent = modUrus ? 'Siap' : 'Urus Profil';
-    btnUrus.classList.toggle('utama', modUrus);
+    btnUrus.lastElementChild.textContent = modUrus ? 'Selesai' : 'Urus profil';
+    lukisIkon(btnUrus.querySelector('svg'), modUrus ? 'betul' : 'pensel');
+    btnUrus.classList.toggle('btn-utama', modUrus);
+    btnUrus.classList.toggle('btn-garis', !modUrus);
 
     isi($('#grid-profil'),
       ...profilList.map((p, i) => el('button', {
-        class: `kad-profil ${modUrus ? 'urus' : ''}`,
-        'data-id': p.id,
-        style: `--i:${i};--c:${p.warna}`,
+        type: 'button', class: `kad-profil ${modUrus ? 'urus' : ''}`, 'data-id': p.id, style: `--i:${i};--c:${p.warna}`,
         onclick: () => (modUrus ? bukaEditProfil(p) : masukProfil(p)),
-        'aria-label': modUrus ? `Edit profil ${p.nama}` : `Masuk sebagai ${p.nama}`,
+        'aria-label': modUrus ? `Edit profil ${p.nama}` : `Masuk sebagai ${p.nama}${p.adaPin ? ' (berkunci)' : ''}`,
       },
-        el('span', { class: 'avatar-bungkus' }, avatar(p), modUrus && el('span', { class: 'avatar-padam' }, '✏️')),
-        el('span', { class: 'nama-profil' }, p.nama, p.adaPin && el('span', { class: 'kunci', title: 'Dikunci dengan PIN' }, ' 🔒')),
+        el('span', { class: 'avatar-bungkus' },
+          avatar(p, 'avatar-besar'),
+          modUrus ? el('span', { class: 'lencana-edit' }, ikon('pensel')) : p.adaPin && el('span', { class: 'lencana-kunci', title: 'Dikunci dengan PIN' }, ikon('kunci'))),
+        el('span', { class: 'nama-profil' }, p.nama),
         modUrus && p.dibuatOleh && el('span', { class: 'oleh-profil', title: `Dibuat oleh ${labelOleh(p.dibuatOleh)}` }, labelOleh(p.dibuatOleh)),
       )),
-      !modUrus && profilList.length < 10 && el('button', { class: 'kad-profil', style: `--i:${profilList.length}`, onclick: bukaTambahProfil },
-        el('span', { class: 'avatar avatar-tambah' }, '+'),
-        el('span', { class: 'nama-profil' }, 'Tambah Profil'),
-      ),
+      !modUrus && profilList.length < 10 && el('button', {
+        type: 'button', class: 'kad-profil', style: `--i:${profilList.length}`, onclick: bukaTambahProfil,
+      }, el('span', { class: 'avatar avatar-besar avatar-tambah' }, ikon('tambah')), el('span', { class: 'nama-profil' }, 'Tambah profil')),
     );
   }
 
@@ -422,37 +371,25 @@
         ? await mintaPin(`Masukkan PIN untuk ${p.nama}`, (pin) => panggilTerus('masukProfil', p.id, pin))
         : await panggilTerus('masukProfil', p.id, '');
     } catch (e) {
-      kad?.classList.remove('memuat');
-      if (e !== 'batal') toast(mesejRalat(e), true);
+      if (e !== 'batal') toast(mesejRalat(e), 'ralat');
       return;
     } finally {
       kad?.classList.remove('memuat');
     }
-    // Peralihan: profil dipilih zoom ke depan, yang lain tenggelam
-    if (bolehGerak) {
-      kad?.classList.add('dipilih');
-      $('#skrin-profil').classList.add('skrin-keluar');
-      await tidur(520);
-      $('#skrin-profil').classList.remove('skrin-keluar');
-    }
+    kad?.classList.add('dipilih');
     profilAktif = p;
     folderAktif = '';
     semua = [];
     folders = [];
-    $('#avatar-kecil').replaceWith(Object.assign(avatar(p, 'avatar-kecil'), { id: 'avatar-kecil' }));
+    $('#cari').value = '';
+    const kecil = avatar(p, 'avatar-kecil');
+    kecil.id = 'avatar-kecil';
+    $('#avatar-kecil').replaceWith(kecil);
     $('#nama-profil-kecil').textContent = p.nama;
-    $('#bahagian-folder').hidden = true;
-    $('#tajuk-fail').hidden = true;
-    $('#kosong').hidden = true;
-    $('#tab-folder').replaceChildren();
-    $('#tab-penunjuk').style.opacity = 0;
-    // Rangka kad bergemerlapan semasa fail dimuatkan
-    $('#senarai').classList.add('animasi');
-    $('#senarai').replaceChildren(...Array.from({ length: 8 }, (_, i) => el('div', { class: 'kad rangka', style: `--i:${i}` },
-      el('div', { class: 'rangka-gambar' }), el('div', { class: 'rangka-baris' }), el('div', { class: 'rangka-baris pendek' }))));
-    tunjuk('skrin-utama');
-    mainkan($('#skrin-utama'), 'skrin-masuk');
+    tunjukRangka();
     pasangLatar(p);
+    await tukarSkrin('skrin-utama');
+    kad?.classList.remove('dipilih');
     animasiSeterusnya = true;
     await muat();
   }
@@ -460,34 +397,12 @@
   function keluarProfil() {
     token = '';
     profilAktif = null;
-    document.querySelectorAll('dialog[open]').forEach((d) => d.close());
+    tutupMenu(true);
+    document.querySelectorAll('dialog[open]').forEach((d) => { delete d.dataset.sibuk; d.close(); });
     pasangLatar(null);
-    tunjuk('skrin-profil');
-    mainkan($('#skrin-profil'), 'skrin-masuk');
+    modUrus = false;
+    tukarSkrin('skrin-profil');
     muatProfil();
-  }
-
-  // Mainkan animasi CSS sekali (buang kelas bila tamat supaya boleh diulang)
-  function mainkan(elem, kelas) {
-    if (!elem || !bolehGerak) return;
-    elem.classList.remove(kelas);
-    void elem.offsetWidth;
-    elem.classList.add(kelas);
-    elem.addEventListener('animationend', () => elem.classList.remove(kelas), { once: true });
-  }
-
-  async function padamProfil() {
-    const p = editProfil.profil;
-    if (!confirm(`Padam profil "${p.nama}" beserta SEMUA failnya?\nFail akan masuk ke Sampah Google Drive (boleh dipulihkan dalam 30 hari).`)) return;
-    try {
-      await panggilTerus('padamProfil', p.id, editProfil.pin);
-    } catch (e) {
-      toast(mesejRalat(e), true);
-      return;
-    }
-    $('#dialog-profil').close();
-    toast(`Profil ${p.nama} dipadam`);
-    await muatProfil();
   }
 
   // Dialog PIN: semak(pin) dipanggil di server; dialog kekal terbuka kalau PIN salah
@@ -499,8 +414,8 @@
       $('#pin-teks').textContent = teks;
       $('#ralat-pin').hidden = true;
       pinSelesai = { ok, gagal, semak };
-      $('#dialog-pin').showModal();
-      b.elements.pin.focus();
+      bukaDialog($('#dialog-pin'));
+      setTimeout(() => b.elements.pin.focus(), 40);
     });
   }
 
@@ -509,7 +424,7 @@
     const b = $('#borang-pin');
     const pin = b.elements.pin.value;
     const r = $('#ralat-pin');
-    if (!/^\d{4}$/.test(pin)) { r.textContent = 'PIN mesti 4 digit.'; r.hidden = false; return; }
+    if (!/^\d{4}$/.test(pin)) { r.textContent = 'PIN mesti 4 digit.'; r.hidden = false; mainkan(b.elements.pin, 'gegar'); return; }
     const btn = $('#btn-pin-ok');
     btn.disabled = true;
     r.hidden = true;
@@ -517,20 +432,20 @@
       const hasil = await pinSelesai.semak(pin);
       const { ok } = pinSelesai;
       pinSelesai = null;
-      $('#dialog-pin').close();
+      tutupDialog($('#dialog-pin'));
       ok(hasil);
     } catch (e) {
       r.textContent = mesejRalat(e);
       r.hidden = false;
       b.elements.pin.select();
-      mainkan(b, 'gegar');
+      mainkan(b.elements.pin, 'gegar');
     } finally {
       btn.disabled = false;
     }
   }
 
   // Dialog tambah / edit profil
-  let pilihanProfil = { ikon: IKON_PROFIL[0], warna: WARNA_PROFIL[0], gambar: '' };
+  let pilihanProfil = { warna: WARNA_PROFIL[0], gambar: '' };
   let editProfil = null; // { profil, pin } bila edit; null bila tambah
   let gambarBerubah = false;
 
@@ -539,22 +454,19 @@
     b.reset();
     gambarBerubah = false;
     pilihanProfil = p
-      ? { ikon: p.ikon, warna: p.warna, gambar: p.gambar || '' }
-      : { ikon: IKON_PROFIL[profilList.length % IKON_PROFIL.length], warna: WARNA_PROFIL[profilList.length % WARNA_PROFIL.length], gambar: '' };
+      ? { warna: p.warna, gambar: p.gambar || '' }
+      : { warna: WARNA_PROFIL[profilList.length % WARNA_PROFIL.length], gambar: '' };
     if (p) b.elements.nama.value = p.nama;
-    $('#tajuk-dialog-profil').textContent = p ? 'Edit Profil' : 'Tambah Profil';
-    $('#btn-simpan-profil').textContent = p ? 'Simpan' : 'Tambah';
+    $('#tajuk-dialog-profil').textContent = p ? 'Edit profil' : 'Tambah profil';
+    $('#btn-simpan-profil').textContent = p ? 'Simpan' : 'Tambah profil';
     $('#btn-padam-profil').hidden = !p;
     $('#bahagian-pin-profil').hidden = !!p;
     const info = $('#info-dibuat');
     info.hidden = !(p && (p.dibuatOleh || p.dibuatPada));
-    if (!info.hidden) {
-      info.textContent = `Dibuat${p.dibuatOleh ? ` oleh ${labelOleh(p.dibuatOleh)}` : ''}${p.dibuatPada ? ` pada ${tarikh(p.dibuatPada)}` : ''}`;
-    }
+    if (!info.hidden) info.textContent = `Dibuat${p.dibuatOleh ? ` oleh ${labelOleh(p.dibuatOleh)}` : ''}${p.dibuatPada ? ` pada ${tarikh(p.dibuatPada)}` : ''}`;
     $('#ralat-profil').hidden = true;
-    paparPilihanProfil();
-    $('#dialog-profil').showModal();
-    b.elements.nama.focus();
+    paparPilihanProfil(true);
+    bukaDialog($('#dialog-profil'));
   }
 
   function bukaTambahProfil() {
@@ -566,29 +478,29 @@
     let pin = '';
     if (p.adaPin) {
       try {
-        pin = await mintaPin(`Masukkan PIN ${p.nama} untuk edit`, async (v) => { await panggilTerus('sahPin', p.id, v); return v; });
+        pin = await mintaPin(`Masukkan PIN ${p.nama} untuk edit profil`, async (v) => { await panggilTerus('sahPin', p.id, v); return v; });
       } catch (e) {
-        if (e !== 'batal') toast(mesejRalat(e), true);
+        if (e !== 'batal') toast(mesejRalat(e), 'ralat');
         return;
       }
+      await tidur(160);
     }
     editProfil = { profil: p, pin };
     bukaDialogProfil(p);
   }
 
-  function paparPilihanProfil() {
-    const pratonton = avatar({ ...pilihanProfil, nama: $('#borang-profil').elements.nama.value });
+  function paparPilihanProfil(animasi) {
+    const b = $('#borang-profil');
+    const pratonton = avatar({ ...pilihanProfil, nama: b.elements.nama.value || '?' }, 'avatar-besar');
     pratonton.id = 'avatar-pratonton';
+    if (!animasi) pratonton.style.animation = 'none';
     $('#avatar-pratonton').replaceWith(pratonton);
     $('#btn-buang-gambar').hidden = !pilihanProfil.gambar;
-    $('#btn-pilih-gambar').textContent = pilihanProfil.gambar ? '🖼️ Tukar gambar' : '🖼️ Upload gambar';
-    $('#pilih-ikon').replaceChildren(...IKON_PROFIL.map((i) => el('button', {
-      type: 'button', class: `pilihan ${!pilihanProfil.gambar && i === pilihanProfil.ikon ? 'aktif' : ''}`, 'aria-label': `Ikon ${i}`,
-      onclick: () => { pilihanProfil.ikon = i; if (pilihanProfil.gambar) { pilihanProfil.gambar = ''; gambarBerubah = true; } paparPilihanProfil(); },
-    }, i)));
-    $('#pilih-warna').replaceChildren(...WARNA_PROFIL.map((w) => el('button', {
-      type: 'button', class: `pilihan warna ${w === pilihanProfil.warna ? 'aktif' : ''}`, style: `background:${w}`, 'aria-label': `Warna ${w}`,
-      onclick: () => { pilihanProfil.warna = w; paparPilihanProfil(); },
+    $('#btn-pilih-gambar').lastElementChild.textContent = pilihanProfil.gambar ? 'Tukar foto' : 'Upload foto';
+    isi($('#pilih-warna'), ...WARNA_PROFIL.map((w) => el('button', {
+      type: 'button', class: 'pilihan-warna', role: 'radio', style: `--c:${w}`, 'aria-label': `Warna ${w}`,
+      'aria-checked': String(w === pilihanProfil.warna),
+      onclick: () => { pilihanProfil.warna = w; paparPilihanProfil(false); },
     })));
   }
 
@@ -596,18 +508,13 @@
   async function kecilkanGambar(fail, sisi = 256) {
     const url = URL.createObjectURL(fail);
     try {
-      const img = await new Promise((ok, gagal) => {
-        const i = new Image();
-        i.onload = () => ok(i);
-        i.onerror = () => gagal(new Error('Fail ni bukan gambar yang boleh dibaca.'));
-        i.src = url;
-      });
+      const img = await muatImej(url);
       const s = Math.min(img.naturalWidth, img.naturalHeight);
       const c = document.createElement('canvas');
       c.width = sisi;
       c.height = sisi;
       c.getContext('2d').drawImage(img, (img.naturalWidth - s) / 2, (img.naturalHeight - s) / 2, s, s, 0, 0, sisi, sisi);
-      return c.toDataURL('image/jpeg', 0.85);
+      return c.toDataURL('image/jpeg', 0.86);
     } finally {
       URL.revokeObjectURL(url);
     }
@@ -620,7 +527,7 @@
     try {
       pilihanProfil.gambar = await kecilkanGambar(fail);
       gambarBerubah = true;
-      paparPilihanProfil();
+      paparPilihanProfil(true);
     } catch (e) {
       $('#ralat-profil').textContent = mesejRalat(e);
       $('#ralat-profil').hidden = false;
@@ -633,67 +540,97 @@
     const r = $('#ralat-profil');
     const nama = b.elements.nama.value.trim();
     const pin = b.elements.pin.value.trim();
+    if (!nama) { r.textContent = 'Masukkan nama profil.'; r.hidden = false; return; }
     if (!editProfil && pin && !/^\d{4}$/.test(pin)) { r.textContent = 'PIN mesti 4 digit nombor.'; r.hidden = false; return; }
     const btn = $('#btn-simpan-profil');
+    const asal = btn.textContent;
     btn.disabled = true;
-    btn.textContent = 'Menyimpan…';
+    isi(btn, el('span', { class: 'pemusing' }), el('span', {}, 'Menyimpan…'));
     r.hidden = true;
     try {
       if (editProfil) {
         await panggilTerus('kemasProfil', editProfil.profil.id, editProfil.pin, {
-          nama, ikon: pilihanProfil.ikon, warna: pilihanProfil.warna,
-          gambar: gambarBerubah ? pilihanProfil.gambar : null,
+          nama, warna: pilihanProfil.warna, gambar: gambarBerubah ? pilihanProfil.gambar : null,
         });
       } else {
-        await panggilTerus('tambahProfil', nama, pilihanProfil.ikon, pilihanProfil.warna, pin, pilihanProfil.gambar);
+        await panggilTerus('tambahProfil', nama, '', pilihanProfil.warna, pin, pilihanProfil.gambar);
       }
-      $('#dialog-profil').close();
+      tutupDialog($('#dialog-profil'));
+      toast(editProfil ? 'Profil dikemas kini' : `Profil ${nama} dibuat`, 'ok');
       await muatProfil();
-      if (!editProfil) {
-        const baru = profilList.find((x) => x.nama.toLowerCase() === nama.toLowerCase());
-        if (baru) setTimeout(() => letupanDari(document.querySelector(`.kad-profil[data-id="${baru.id}"] .avatar`)), 700);
-      }
     } catch (e) {
       r.textContent = mesejRalat(e);
       r.hidden = false;
     } finally {
       btn.disabled = false;
-      btn.textContent = editProfil ? 'Simpan' : 'Tambah';
+      btn.textContent = asal;
     }
   }
 
+  async function padamProfil() {
+    const p = editProfil.profil;
+    if (!confirm(`Padam profil "${p.nama}" beserta SEMUA failnya?\n\nFail akan masuk ke Sampah Google Drive dan boleh dipulihkan dalam 30 hari.`)) return;
+    const btn = $('#btn-padam-profil');
+    btn.disabled = true;
+    try {
+      await panggilTerus('padamProfil', p.id, editProfil.pin);
+    } catch (e) {
+      toast(mesejRalat(e), 'ralat');
+      return;
+    } finally {
+      btn.disabled = false;
+    }
+    tutupDialog($('#dialog-profil'));
+    toast(`Profil ${p.nama} dipadam`, 'ok');
+    await muatProfil();
+  }
+
+  function menuProfil(pencetus) {
+    bukaMenu(pencetus, [
+      { ikon: 'gambar', label: 'Latar belakang', tindakan: bukaDialogLatar },
+      '-',
+      { ikon: 'keluar', label: 'Tukar profil', tindakan: keluarProfil },
+    ], el('span', {}, el('strong', {}, profilAktif?.nama || ''), saya.emel || labelOleh(saya.id)));
+  }
+
   // ---------- Muat fail ----------
+  function tunjukRangka() {
+    $('#bahagian-folder').hidden = true;
+    $('#tajuk-fail').hidden = true;
+    $('#kosong').hidden = true;
+    $('#ruang').textContent = '';
+    isi($('#serbuk'), el('span', { class: 'serbuk-item kini' }, ikon('rumah'), el('span', {}, 'Utama')));
+    const s = $('#senarai');
+    s.classList.add('masuk');
+    isi(s, ...Array.from({ length: modPaparan === 'senarai' ? 6 : 8 }, (_, i) => el('div', { class: 'kad rangka', style: `--i:${i}` },
+      el('div', { class: 'rangka-gambar' }), el('div', {}, el('div', { class: 'rangka-baris' }), el('div', { class: 'rangka-baris pendek' })))));
+  }
+
   async function muat() {
     let d;
     try {
       d = await panggil('senarai');
     } catch (e) {
       if (!token) return;
+      $('#senarai').replaceChildren();
       $('#kosong').hidden = false;
-      $('#kosong').replaceChildren(el('div', { class: 'kosong-ikon' }, '⚠️'), el('p', {}, mesejRalat(e)));
+      isi($('#kosong'), el('div', { class: 'kosong-ikon' }, ikon('amaran')), el('h3', {}, 'Tak dapat memuatkan fail'), el('p', {}, mesejRalat(e)),
+        el('button', { type: 'button', class: 'btn btn-garis', onclick: () => { tunjukRangka(); muat(); } }, 'Cuba lagi'));
       return;
     }
     akarId = d.akarId;
     folders = d.folders;
     semua = d.fail;
-
-    $('#ruang-guna').textContent = `${semua.length} fail · ${saiz(semua.reduce((n, f) => n + f.saiz, 0))}`;
-    $('#ruang-had').textContent = d.guna
-      ? ` · Drive: ${saiz(d.guna)} digunakan${d.had > 0 && d.had < 1e15 ? ` daripada ${saiz(d.had)}` : ''}`
-      : '';
-    const peratus = d.had > 0 && d.had < 1e15 ? Math.min(100, (d.guna / d.had) * 100) : 0;
-    $('.ruang-bar').hidden = !peratus;
-    $('#ruang-isi').style.width = `${Math.max(peratus, 0.5)}%`;
-    $('#ruang-isi').classList.toggle('penuh', peratus > 85);
-
+    const jumlah = semua.reduce((n, f) => n + f.saiz, 0);
+    $('#ruang').textContent = `${semua.length} fail · ${saiz(jumlah)}${d.guna ? ` · Drive: ${saiz(d.guna)} digunakan${d.had > 0 && d.had < 1e15 ? ` daripada ${saiz(d.had)}` : ''}` : ''}`;
     if (folderAktif && folderAktif !== akarId && !folders.some((f) => f.id === folderAktif)) folderAktif = '';
-    $('#senarai-folder').replaceChildren(
-      ...[...new Set([...folders.map((f) => f.nama), ...FOLDER_CADANGAN])].map((f) => el('option', {}, f)),
-    );
+    isi($('#senarai-folder'), ...[...new Set([...folders.map((f) => f.nama), ...FOLDER_CADANGAN])].map((f) => el('option', {}, f)));
     papar();
   }
 
   // ---------- Paparan ----------
+  const namaFolder = (id) => (id === akarId ? 'Utama' : (folders.find((f) => f.id === id)?.nama || '?'));
+
   const susunFail = (list) => {
     const susun = $('#susun').value;
     return list.sort((a, b) => {
@@ -703,37 +640,50 @@
     });
   };
 
-  // folderAktif '' = halaman utama: kad folder (dengan pratonton) + fail yang tiada folder
+  function bukaPaparan(id) {
+    folderAktif = id;
+    animasiSeterusnya = true;
+    papar();
+    window.scrollTo({ top: 0, behavior: bolehGerak ? 'smooth' : 'auto' });
+  }
+
+  function aturMod() {
+    const senarai = modPaparan === 'senarai';
+    $('#isi').classList.toggle('mod-senarai', senarai);
+    $('#grid-folder').classList.toggle('mod-senarai', senarai);
+    $('#senarai').classList.toggle('mod-senarai', senarai);
+    const segmen = $('.segmen');
+    segmen.dataset.mod = modPaparan;
+    segmen.querySelectorAll('.segmen-btn').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.paparan === modPaparan)));
+  }
+
   function papar() {
-    const bil = (id) => semua.filter((x) => x.folderId === id).length;
-    const tab = (id, label, n) => el('button', {
-      class: `tab ${folderAktif === id ? 'aktif' : ''}`,
-      onclick: () => bukaPaparan(id),
-    }, label, n != null && el('span', { class: 'tab-bil' }, String(n)));
-    const tersusun = [...folders].sort((a, b) => a.nama.localeCompare(b.nama, 'ms', { numeric: true }));
-    isi($('#tab-folder'),
-      tab('', '🏠 Utama', null),
-      ...tersusun.map((f) => tab(f.id, `📁 ${f.nama}`, bil(f.id))),
-      el('button', { class: 'tab tab-baru', onclick: folderBaru }, '+ Folder Baru'),
+    const q = $('#cari').value.trim().toLowerCase();
+    const dalamFolder = folderAktif && folderAktif !== akarId;
+
+    // Laluan (breadcrumb)
+    isi($('#serbuk'),
+      el(dalamFolder || q ? 'button' : 'span', {
+        type: dalamFolder || q ? 'button' : null,
+        class: `serbuk-item ${dalamFolder || q ? '' : 'kini'}`,
+        onclick: dalamFolder || q ? () => { $('#cari').value = ''; bukaPaparan(''); } : null,
+      }, ikon('rumah'), el('span', {}, 'Utama')),
+      dalamFolder && !q && [
+        ikon('kanan', 'serbuk-pemisah'),
+        el('span', { class: 'serbuk-item kini' }, el('span', {}, namaFolder(folderAktif))),
+        el('button', { type: 'button', class: 'btn-ikon kecil', 'aria-label': 'Pilihan folder', 'aria-haspopup': 'menu', onclick: (ev) => menuFolder(ev.currentTarget, folderAktif, false) }, ikon('lagi')),
+      ],
+      q && [ikon('kanan', 'serbuk-pemisah'), el('span', { class: 'serbuk-item kini' }, el('span', {}, `Carian: “${$('#cari').value.trim()}”`))],
     );
 
-    const dalamFolder = folderAktif && folderAktif !== akarId;
-    $('#tajuk-folder').hidden = !dalamFolder;
-    if (dalamFolder) $('#nama-folder').textContent = `📁 ${namaFolder(folderAktif)}`;
-
-    const q = $('#cari').value.trim().toLowerCase();
-    const diUtama = !folderAktif && !q;
-
-    // Kad folder: di halaman utama, atau folder yang namanya sepadan dengan carian
-    const kadFolderList = !folderAktif
-      ? tersusun.filter((f) => !q || f.nama.toLowerCase().includes(q))
-      : [];
+    const tersusun = [...folders].sort((a, b) => a.nama.localeCompare(b.nama, 'ms', { numeric: true }));
+    const kadFolderList = !dalamFolder ? tersusun.filter((f) => !q || f.nama.toLowerCase().includes(q)) : [];
     $('#bahagian-folder').hidden = !kadFolderList.length;
     $('#grid-folder').replaceChildren(...kadFolderList.map(kadFolder));
 
     const senarai = susunFail(semua.filter((f) => {
-      if (q) return (!folderAktif || f.folderId === folderAktif) && `${f.nama} ${namaFolder(f.folderId)}`.toLowerCase().includes(q);
-      return f.folderId === (folderAktif || akarId);
+      if (q) return (!dalamFolder || f.folderId === folderAktif) && `${f.nama} ${namaFolder(f.folderId)}`.toLowerCase().includes(q);
+      return f.folderId === (dalamFolder ? folderAktif : akarId);
     }));
     $('#tajuk-fail').hidden = !(senarai.length && kadFolderList.length);
     $('#senarai').replaceChildren(...senarai.map(kadFail));
@@ -743,52 +693,26 @@
     animasiSeterusnya = false;
     let indeks = 0;
     for (const bekas of [$('#grid-folder'), $('#senarai')]) {
-      bekas.classList.toggle('animasi', anim);
+      bekas.classList.toggle('masuk', anim);
       for (const k of bekas.children) k.style.setProperty('--i', indeks++);
     }
-    requestAnimationFrame(gerakPenunjuk);
 
     const k = $('#kosong');
     k.hidden = senarai.length > 0 || kadFolderList.length > 0;
     if (!k.hidden) {
       isi(k,
-        el('div', { class: 'kosong-ikon' }, q ? '🔍' : '📂'),
-        el('p', {}, q ? 'Tiada fail atau folder sepadan.' : diUtama ? 'Belum ada fail lagi.' : 'Folder ni kosong.'),
-        !q && el('p', { class: 'pudar' }, 'Tekan ⬆ Upload Fail atau 📁 Upload Folder, atau seret ke sini.'),
+        el('div', { class: 'kosong-ikon' }, ikon(q ? 'cari' : 'folder')),
+        el('h3', {}, q ? 'Tiada hasil' : dalamFolder ? 'Folder ni kosong' : 'Belum ada fail'),
+        el('p', {}, q ? 'Cuba cari dengan perkataan lain.' : 'Seret fail atau folder ke sini, atau tekan butang di bawah.'),
+        !q && el('button', { type: 'button', class: 'btn btn-utama', onclick: () => $('#input-fail').click() }, ikon('upload'), el('span', {}, 'Upload fail')),
       );
     }
   }
 
-  function bukaPaparan(id) {
-    folderAktif = id;
-    animasiSeterusnya = true;
-    papar();
-    window.scrollTo({ top: 0, behavior: bolehGerak ? 'smooth' : 'auto' });
-  }
-
-  // Penunjuk tab menggelongsor ke tab aktif
-  function gerakPenunjuk() {
-    const pen = $('#tab-penunjuk');
-    const a = $('#tab-folder .tab.aktif');
-    if (!a || $('#skrin-utama').hidden) { pen.style.opacity = 0; return; }
-    const mulaKali = pen.style.opacity !== '1';
-    if (mulaKali) pen.style.transition = 'none';
-    pen.style.width = `${a.offsetWidth}px`;
-    pen.style.height = `${a.offsetHeight}px`;
-    pen.style.transform = `translate(${a.offsetLeft}px, ${a.offsetTop}px)`;
-    pen.style.opacity = 1;
-    if (mulaKali) { void pen.offsetWidth; pen.style.transition = ''; }
-    const bungkus = pen.parentElement;
-    if (a.offsetLeft < bungkus.scrollLeft || a.offsetLeft + a.offsetWidth > bungkus.scrollLeft + bungkus.clientWidth) {
-      bungkus.scrollTo({ left: a.offsetLeft - 24, behavior: bolehGerak ? 'smooth' : 'auto' });
-    }
-  }
-  addEventListener('resize', () => requestAnimationFrame(gerakPenunjuk));
-
   // ---------- Pratonton gambar ----------
   // Keutamaan: salinan tempatan (baru diupload) → thumbnail Google → gambar kecil dari server
-  const thumbLokal = new Map();  // id fail -> object URL
-  const thumbServer = new Map(); // id fail -> Promise<dataUrl | ''>
+  const thumbLokal = new Map();
+  const thumbServer = new Map();
   let barisanThumb = Promise.resolve();
   const bolehPratonton = (f) => !!f.thumb || thumbLokal.has(f.id) || f.jenis.startsWith('image/');
 
@@ -802,8 +726,8 @@
     return thumbServer.get(f.id);
   }
 
-  function gambarPratonton(f, ikonGanti) {
-    const ganti = () => el('span', { class: 'kad-ikon' }, ikonGanti);
+  function gambarPratonton(f) {
+    const ganti = () => lencanaFail(f);
     const img = el('img', { alt: '', loading: 'lazy', referrerpolicy: 'no-referrer', decoding: 'async' });
     img.addEventListener('load', () => img.classList.add('dimuat'));
     const dariServer = () => {
@@ -812,16 +736,12 @@
         else img.replaceWith(ganti());
       });
     };
-    if (thumbLokal.has(f.id)) {
-      img.src = thumbLokal.get(f.id);
-    } else if (f.thumb) {
+    if (thumbLokal.has(f.id)) img.src = thumbLokal.get(f.id);
+    else if (f.thumb) {
       img.addEventListener('error', dariServer, { once: true });
       img.src = f.thumb;
-    } else if (f.jenis.startsWith('image/')) {
-      dariServer();
-    } else {
-      return ganti();
-    }
+    } else if (f.jenis.startsWith('image/')) dariServer();
+    else return ganti();
     return img;
   }
 
@@ -829,45 +749,71 @@
     const isiFolder = semua.filter((f) => f.folderId === folder.id);
     const gambar = susunFail(isiFolder.filter(bolehPratonton)).slice(0, 4);
     const jumlah = isiFolder.reduce((n, f) => n + f.saiz, 0);
-    const kulit = gambar.length
-      ? el('div', { class: `mozek mozek-${gambar.length}` }, gambar.map((f) => el('div', { class: 'mozek-sel' }, gambarPratonton(f, ikonFail(f)))))
-      : el('span', { class: 'kad-ikon folder-ikon' }, isiFolder.length ? '📁' : '📂');
-
+    const buka = () => bukaPaparan(folder.id);
     return el('article', { class: 'kad kad-folder' },
-      el('button', { class: 'kad-pratonton', title: `Buka folder ${folder.nama}`, onclick: () => bukaPaparan(folder.id) },
-        kulit,
-        el('span', { class: 'lencana-folder' }, '📁'),
+      el('button', { type: 'button', class: 'kad-pratonton', 'aria-label': `Buka folder ${folder.nama}`, onclick: buka },
+        gambar.length
+          ? el('div', { class: `mozek mozek-${gambar.length}` }, gambar.map((f) => el('div', { class: 'mozek-sel' }, gambarPratonton(f))))
+          : ikon('folder', 'folder-besar'),
+        gambar.length > 0 && ikon('folder', 'folder-besar folder-senarai'),
       ),
       el('div', { class: 'kad-badan' },
-        el('button', { class: 'kad-nama', title: folder.nama, onclick: () => bukaPaparan(folder.id) }, folder.nama),
-        el('div', { class: 'kad-meta pudar' },
-          el('span', {}, `${isiFolder.length} fail`),
-          jumlah > 0 && el('span', {}, saiz(jumlah)),
-          olehSpan(folder.oleh),
+        el('button', { type: 'button', class: 'kad-nama', title: folder.nama, onclick: buka }, ikon('folder', 'ik-folder'), el('span', {}, folder.nama)),
+        el('div', { class: 'kad-meta' },
+          el('span', { class: 'meta-oleh' }, labelOleh(folder.oleh)),
+          el('span', { class: 'meta-tarikh' }, `${isiFolder.length} fail`),
+          el('span', { class: 'meta-saiz' }, jumlah > 0 ? saiz(jumlah) : ''),
         ),
       ),
+      el('button', { type: 'button', class: 'btn-ikon kad-menu', 'aria-label': `Pilihan untuk ${folder.nama}`, 'aria-haspopup': 'menu', onclick: (ev) => menuFolder(ev.currentTarget, folder.id, true) }, ikon('lagi')),
     );
   }
 
   function kadFail(f) {
-    return el('article', { class: 'kad' },
-      el('button', { class: 'kad-pratonton', title: 'Buka', onclick: () => bukaFail(f) }, gambarPratonton(f, ikonFail(f))),
+    const lokasiLain = f.folderId !== (folderAktif && folderAktif !== akarId ? folderAktif : akarId);
+    return el('article', { class: 'kad kad-fail' },
+      el('button', { type: 'button', class: 'kad-pratonton', 'aria-label': `Buka ${f.nama}`, onclick: () => bukaFail(f) }, gambarPratonton(f)),
       el('div', { class: 'kad-badan' },
-        el('button', { class: 'kad-nama', title: f.nama, onclick: () => bukaFail(f) }, f.nama),
-        el('div', { class: 'kad-meta pudar' },
-          f.folderId !== (folderAktif || akarId) && el('span', {}, `📁 ${namaFolder(f.folderId)}`),
-          f.saiz > 0 && el('span', {}, saiz(f.saiz)),
-          el('span', {}, tarikh(f.tarikh)),
-          olehSpan(f.oleh),
-        ),
-        el('div', { class: 'kad-aksi' },
-          el('button', { class: 'btn ikon', title: 'Muat turun', 'aria-label': 'Muat turun', onclick: () => muatTurun(f) }, '⬇️'),
-          el('button', { class: 'btn ikon', title: 'Tukar nama', 'aria-label': 'Tukar nama', onclick: () => tukarNamaFail(f) }, '✏️'),
-          el('button', { class: 'btn ikon', title: 'Pindah folder', 'aria-label': 'Pindah folder', onclick: () => pindahFail(f) }, '📁'),
-          el('button', { class: 'btn ikon', title: 'Padam', 'aria-label': 'Padam', onclick: () => padamFail(f) }, '🗑️'),
+        el('button', { type: 'button', class: 'kad-nama', title: f.nama, onclick: () => bukaFail(f) }, el('span', {}, f.nama)),
+        lokasiLain && el('span', { class: 'nama-lokasi' }, namaFolder(f.folderId)),
+        el('div', { class: 'kad-meta' },
+          el('span', { class: 'meta-oleh', title: f.oleh ? `Diupload oleh ${labelOleh(f.oleh)}` : null }, labelOleh(f.oleh)),
+          el('span', { class: 'meta-tarikh' }, tarikh(f.tarikh)),
+          el('span', { class: 'meta-saiz' }, f.saiz > 0 ? saiz(f.saiz) : ''),
         ),
       ),
+      el('button', { type: 'button', class: 'btn-ikon kad-menu', 'aria-label': `Pilihan untuk ${f.nama}`, 'aria-haspopup': 'menu', onclick: (ev) => menuFail(ev.currentTarget, f) }, ikon('lagi')),
     );
+  }
+
+  function menuFail(pencetus, f) {
+    bukaMenu(pencetus, [
+      { ikon: 'buka', label: 'Buka', tindakan: () => bukaFail(f) },
+      { ikon: 'muatTurun', label: 'Muat turun', tindakan: () => muatTurun(f) },
+      '-',
+      { ikon: 'pensel', label: 'Tukar nama', tindakan: () => tukarNamaFail(f) },
+      { ikon: 'pindah', label: 'Pindah ke folder', tindakan: () => pindahFail(f) },
+      '-',
+      { ikon: 'sampah', label: 'Padam', bahaya: true, tindakan: () => padamFail(f) },
+    ], innerWidth < 600 ? el('span', {}, el('strong', {}, f.nama), `${saiz(f.saiz)} · ${tarikh(f.tarikh)}`) : null);
+  }
+
+  function menuFolder(pencetus, id, adaBuka) {
+    bukaMenu(pencetus, [
+      adaBuka && { ikon: 'buka', label: 'Buka', tindakan: () => bukaPaparan(id) },
+      adaBuka && '-',
+      { ikon: 'pensel', label: 'Tukar nama', tindakan: () => tukarNamaFolder(id) },
+      { ikon: 'sampah', label: 'Padam folder', bahaya: true, tindakan: () => padamFolder(id) },
+    ], innerWidth < 600 ? el('span', {}, el('strong', {}, namaFolder(id))) : null);
+  }
+
+  function menuBaru(pencetus) {
+    bukaMenu(pencetus, [
+      { ikon: 'upload', label: 'Upload fail', tindakan: () => $('#input-fail').click() },
+      { ikon: 'uploadFolder', label: 'Upload folder', tindakan: () => $('#input-folder').click() },
+      '-',
+      { ikon: 'folderBaru', label: 'Folder baru', tindakan: folderBaru },
+    ]);
   }
 
   // ---------- Buka / muat turun (fail diambil melalui server dalam cebisan) ----------
@@ -880,13 +826,13 @@
 
   async function ambilFail(f) {
     if (isGoogleDoc(f)) {
-      toast('Menyediakan PDF…', false, true);
+      toast('Menyediakan PDF…', 'muat', true);
       const r = await panggil('eksportPdf', f.id);
       return { blob: new Blob([base64KeBait(r.b64)], { type: 'application/pdf' }), nama: r.nama };
     }
     const bahagian = [];
     for (let mula = 0; mula < f.saiz; mula += CEBISAN_TURUN) {
-      toast(`Memuatkan ${f.nama}… ${Math.round((mula / f.saiz) * 100)}%`, false, true);
+      toast(`Memuatkan ${f.nama} · ${Math.round((mula / f.saiz) * 100)}%`, 'muat', true);
       bahagian.push(base64KeBait(await panggil('bacaCebisan', f.id, mula, Math.min(CEBISAN_TURUN, f.saiz - mula))));
     }
     return { blob: new Blob(bahagian, { type: f.jenis || 'application/octet-stream' }), nama: f.nama };
@@ -894,15 +840,15 @@
 
   async function bukaFail(f) {
     const w = window.open('', '_blank'); // buka dulu supaya tak disekat popup blocker
-    if (w) w.document.write('<p style="font-family:system-ui;padding:20px">Memuatkan…</p>');
+    if (w) w.document.write('<p style="font-family:system-ui,sans-serif;padding:24px;color:#475467">Memuatkan…</p>');
     try {
       const { blob } = await ambilFail(f);
       const url = URL.createObjectURL(blob);
       if (w) w.location.href = url; else window.open(url, '_blank');
-      $('#toast').hidden = true;
+      tutupToast();
     } catch (e) {
       w?.close();
-      toast(mesejRalat(e), true);
+      toast(mesejRalat(e), 'ralat');
     }
   }
 
@@ -911,18 +857,20 @@
       const { blob, nama } = await ambilFail(f);
       const url = URL.createObjectURL(blob);
       const a = el('a', { href: url, download: nama });
-      document.body.append(a); a.click(); a.remove();
+      document.body.append(a);
+      a.click();
+      a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60000);
-      toast(`${nama} dimuat turun ✔`);
+      toast(`${nama} dimuat turun`, 'ok');
     } catch (e) {
-      toast(mesejRalat(e), true);
+      toast(mesejRalat(e), 'ralat');
     }
   }
 
   // ---------- Latar belakang profil ----------
   const cacheLatar = new Map(); // latarId -> object URL
   let giliranLatar = 0;
-  let latarBaru; // undefined = tiada perubahan, '' = galaksi lalai, dataUrl = gambar baru
+  let latarBaru; // undefined = tiada perubahan, '' = latar lalai, dataUrl = gambar baru
 
   const dataUrlKeBlobUrl = (dataUrl) => {
     const [kepala, b64] = dataUrl.split(',');
@@ -937,14 +885,10 @@
     i.src = url;
   });
 
-  // Pasang latar profil (gambar sendiri) atau kembali ke galaksi 3D lalai
   async function pasangLatar(p) {
     const giliran = ++giliranLatar;
-    if (!p || !p.latarId) {
-      latarEl.classList.remove('ada-gambar');
-      Galaksi.intensiti(1);
-      return;
-    }
+    const latar = $('#latar');
+    if (!p || !p.latarId) { latar.classList.remove('ada-imej'); return; }
     let url = cacheLatar.get(p.latarId);
     if (!url) {
       try {
@@ -958,9 +902,8 @@
     }
     try { await muatImej(url); } catch { return; }
     if (giliran !== giliranLatar) return; // pengguna dah tukar profil
-    $('#latar-gambar-isi').style.backgroundImage = `url("${url}")`;
-    latarEl.classList.add('ada-gambar');
-    Galaksi.intensiti(0.55);
+    $('#latar-imej').style.backgroundImage = `url("${url}")`;
+    latar.classList.add('ada-imej');
   }
 
   // Kecilkan ke maksimum 3840px (4K) dan mampatkan sehingga muat had server
@@ -968,7 +911,7 @@
     const url = URL.createObjectURL(fail);
     try {
       const img = await muatImej(url);
-      for (const [maks, kualiti] of [[3840, 0.88], [3840, 0.76], [2560, 0.8], [1920, 0.78]]) {
+      for (const [maks, kualiti] of [[3840, 0.86], [3840, 0.74], [2560, 0.8], [1920, 0.78]]) {
         const sk = Math.min(1, maks / Math.max(img.naturalWidth, img.naturalHeight));
         const c = document.createElement('canvas');
         c.width = Math.round(img.naturalWidth * sk);
@@ -989,16 +932,16 @@
     const k = $('#pratonton-latar');
     k.classList.toggle('lalai', !url);
     k.style.backgroundImage = url ? `url("${url}")` : '';
-    k.replaceChildren(el('span', {}, label || (url ? '🖼️ Gambar sendiri' : '✨ Galaksi 3D (lalai)')));
-    mainkan(k, 'skrin-masuk');
+    isi(k, el('span', {}, label || (url ? 'Gambar sendiri' : 'Latar lalai')));
+    mainkan(k, 'tukar');
   }
 
   function bukaDialogLatar() {
     latarBaru = undefined;
     $('#ralat-latar').hidden = true;
     const id = profilAktif?.latarId;
-    paparPratontonLatar(id ? cacheLatar.get(id) : '', id && !cacheLatar.get(id) ? '🖼️ Gambar sendiri' : '');
-    $('#dialog-latar').showModal();
+    paparPratontonLatar(id ? cacheLatar.get(id) : '', id && !cacheLatar.get(id) ? 'Gambar sendiri' : '');
+    bukaDialog($('#dialog-latar'));
   }
 
   async function pilihLatar(ev) {
@@ -1007,7 +950,7 @@
     if (!fail) return;
     const r = $('#ralat-latar');
     r.hidden = true;
-    paparPratontonLatar('', '⏳ Menyediakan gambar 4K…');
+    paparPratontonLatar('', 'Menyediakan gambar…');
     try {
       latarBaru = await kecilkanLatar(fail);
       paparPratontonLatar(dataUrlKeBlobUrl(latarBaru));
@@ -1021,11 +964,11 @@
 
   async function simpanLatar(ev) {
     ev.preventDefault();
-    if (latarBaru === undefined) { $('#dialog-latar').close(); return; }
+    if (latarBaru === undefined) { tutupDialog($('#dialog-latar')); return; }
     const btn = $('#btn-simpan-latar');
     const r = $('#ralat-latar');
     btn.disabled = true;
-    btn.textContent = 'Menyimpan…';
+    isi(btn, el('span', { class: 'pemusing' }), el('span', {}, 'Menyimpan…'));
     r.hidden = true;
     try {
       const { latarId } = await panggil('tukarLatar', latarBaru);
@@ -1033,10 +976,9 @@
       const dalamSenarai = profilList.find((x) => x.id === profilAktif.id);
       if (dalamSenarai) dalamSenarai.latarId = latarId;
       if (latarId) cacheLatar.set(latarId, dataUrlKeBlobUrl(latarBaru));
-      letupanDari(btn);
       await pasangLatar(profilAktif);
-      $('#dialog-latar').close();
-      toast(latarId ? 'Latar belakang ditukar ✨' : 'Kembali ke galaksi 3D ✨');
+      tutupDialog($('#dialog-latar'));
+      toast(latarId ? 'Latar belakang ditukar' : 'Kembali ke latar lalai', 'ok');
     } catch (e) {
       r.textContent = mesejRalat(e);
       r.hidden = false;
@@ -1061,35 +1003,38 @@
 
   function folderBaru() {
     mintaTeks({
-      tajuk: 'Folder baru', label: 'Nama folder', nilai: '',
+      tajuk: 'Folder baru', label: 'Nama folder', nilai: '', butang: 'Buat folder',
       ok: async (v) => {
         if (folders.some((f) => f.nama.toLowerCase() === v.toLowerCase())) throw new Error('Folder tu dah wujud.');
-        folderAktif = await idFolder(v);
+        const id = await idFolder(v);
+        folderAktif = id;
+        animasiSeterusnya = true;
+        toast(`Folder ${v} dibuat`, 'ok');
       },
     });
   }
 
-  function tukarNamaFolder() {
-    const id = folderAktif;
+  function tukarNamaFolder(id) {
     mintaTeks({
       tajuk: 'Tukar nama folder', label: 'Nama baru', nilai: namaFolder(id),
       ok: async (v) => {
         if (folders.some((f) => f.id !== id && f.nama.toLowerCase() === v.toLowerCase())) throw new Error('Folder tu dah wujud.');
         await panggil('tukarNamaFolder', id, v);
-        toast('Nama folder ditukar');
+        toast('Nama folder ditukar', 'ok');
       },
     });
   }
 
-  async function padamFolder() {
-    const id = folderAktif;
+  async function padamFolder(id) {
     const n = semua.filter((x) => x.folderId === id).length;
-    if (!confirm(`Padam folder "${namaFolder(id)}"${n ? ` dan ${n} fail di dalamnya` : ''}?\nIa akan masuk ke Sampah Google Drive (boleh dipulihkan dalam 30 hari).`)) return;
+    if (!confirm(`Padam folder "${namaFolder(id)}"${n ? ` dan ${n} fail di dalamnya` : ''}?\n\nIa akan masuk ke Sampah Google Drive dan boleh dipulihkan dalam 30 hari.`)) return;
+    toast('Memadam folder…', 'muat', true);
     try {
       await panggil('padamFolder', id);
-    } catch (e) { toast(mesejRalat(e), true); return; }
-    folderAktif = '';
-    toast('Folder dipindah ke Sampah');
+    } catch (e) { toast(mesejRalat(e), 'ralat'); return; }
+    if (folderAktif === id) folderAktif = '';
+    animasiSeterusnya = true;
+    toast('Folder dipindah ke Sampah', 'ok');
     await muat();
   }
 
@@ -1097,52 +1042,54 @@
   function tukarNamaFail(f) {
     const titik = f.nama.lastIndexOf('.');
     mintaTeks({
-      tajuk: 'Tukar nama fail', label: 'Nama baru', nilai: f.nama,
-      pilih: titik > 0 ? [0, titik] : null,
+      tajuk: 'Tukar nama fail', label: 'Nama baru', nilai: f.nama, pilih: titik > 0 ? [0, titik] : null,
       ok: async (v) => {
         await panggil('tukarNamaFail', f.id, v);
-        toast('Nama ditukar');
+        toast('Nama fail ditukar', 'ok');
       },
     });
   }
 
   function pindahFail(f) {
     mintaTeks({
-      tajuk: 'Pindah ke folder', label: 'Folder', nilai: '', senarai: true,
+      tajuk: 'Pindah ke folder', label: 'Folder (pilih atau taip nama baru)', nilai: '', senarai: true, butang: 'Pindah',
       ok: async (v) => {
         const id = await idFolder(v);
         if (id === f.folderId) return;
         await panggil('pindahFail', f.id, id);
-        toast(`Dipindah ke ${namaFolder(id)}`);
+        toast(`Dipindah ke ${namaFolder(id)}`, 'ok');
       },
     });
   }
 
   async function padamFail(f) {
-    if (!confirm(`Padam "${f.nama}"?\nIa akan masuk ke Sampah Google Drive (boleh dipulihkan dalam 30 hari).`)) return;
+    if (!confirm(`Padam "${f.nama}"?\n\nIa akan masuk ke Sampah Google Drive dan boleh dipulihkan dalam 30 hari.`)) return;
     try {
       await panggil('padamFail', f.id);
-    } catch (e) { toast(mesejRalat(e), true); return; }
+    } catch (e) { toast(mesejRalat(e), 'ralat'); return; }
     semua = semua.filter((x) => x.id !== f.id);
     papar();
-    toast('Fail dipindah ke Sampah');
+    toast('Fail dipindah ke Sampah', 'ok');
   }
 
   // ---------- Dialog teks ----------
   let tindakanTeks = null;
-  function mintaTeks({ tajuk, label, nilai, ok, senarai = false, pilih = null }) {
+  function mintaTeks({ tajuk, label, nilai, ok, senarai = false, pilih = null, butang = 'Simpan' }) {
     const b = $('#borang-teks');
     $('#teks-tajuk').textContent = tajuk;
     $('#teks-label').textContent = label;
+    $('#btn-teks-ok').textContent = butang;
     $('#ralat-teks').hidden = true;
     b.elements.nilai.value = nilai;
     if (senarai) b.elements.nilai.setAttribute('list', 'senarai-folder');
     else b.elements.nilai.removeAttribute('list');
     tindakanTeks = ok;
-    $('#dialog-teks').showModal();
-    b.elements.nilai.focus();
-    if (pilih) b.elements.nilai.setSelectionRange(...pilih);
-    else b.elements.nilai.select();
+    bukaDialog($('#dialog-teks'));
+    setTimeout(() => {
+      b.elements.nilai.focus();
+      if (pilih) b.elements.nilai.setSelectionRange(...pilih);
+      else b.elements.nilai.select();
+    }, 40);
   }
 
   async function hantarTeks(ev) {
@@ -1151,26 +1098,26 @@
     const r = $('#ralat-teks');
     const v = $('#borang-teks').elements.nilai.value.trim();
     if (!v) return;
+    const asal = btn.textContent;
     btn.disabled = true;
-    btn.textContent = 'Sekejap…';
+    isi(btn, el('span', { class: 'pemusing' }), el('span', {}, 'Sekejap…'));
     r.hidden = true;
     try {
       await tindakanTeks(v);
       await muat();
-      $('#dialog-teks').close();
+      tutupDialog($('#dialog-teks'));
     } catch (e) {
       r.textContent = mesejRalat(e);
       r.hidden = false;
     } finally {
       btn.disabled = false;
-      btn.textContent = 'OK';
+      btn.textContent = asal;
     }
   }
 
   // ---------- Upload ----------
-  // Setiap item: { fail, folder, nama }. folder = nama folder asal (upload folder) atau null (ikut pilihan dialog)
+  // Setiap item: { fail, folder, nama, status }. folder = nama folder asal (upload folder) atau null
   const itemFail = (fail) => ({ fail, folder: null, nama: fail.name });
-
   // Fail dari folder: folder teratas jadi folder dalam profil; subfolder diratakan ke dalam nama fail
   const itemDariLaluan = (fail, laluan) => {
     const bahagian = laluan.split('/').filter(Boolean);
@@ -1179,38 +1126,66 @@
   };
 
   function bukaUpload(items) {
+    if (!items.length) return;
+    const d = $('#dialog-upload');
+    if (d.open) { tambahItemUpload(items); return; }
     failUpload = [];
+    $('#senarai-upload').replaceChildren();
     tambahItemUpload(items);
-    if (!failUpload.length) return;
     $('#borang-upload').elements.folder.value = folderAktif && folderAktif !== akarId ? namaFolder(folderAktif) : 'Utama';
     $('#ralat-upload').hidden = true;
     $('#kemajuan-upload').hidden = true;
-    if (!$('#dialog-upload').open) $('#dialog-upload').showModal();
+    bukaDialog(d);
   }
 
   function tambahItemUpload(items) {
-    failUpload.push(...items);
+    for (const it of items) {
+      it.status = 'tunggu';
+      it.p = 0;
+      failUpload.push(it);
+      $('#senarai-upload').append(barisUpload(it));
+    }
     paparUpload();
   }
 
+  function barisUpload(it) {
+    it.elStatus = el('span', { class: 'upload-status' });
+    it.li = el('li', { class: 'upload-baris' },
+      lencanaFail({ nama: it.nama, jenis: it.fail.type || '' }),
+      el('div', { class: 'upload-info' },
+        el('span', { class: 'upload-nama', title: it.nama }, it.folder && el('span', { class: 'pudar' }, `${it.folder} / `), it.nama),
+        el('span', { class: 'upload-saiz' }, saiz(it.fail.size))),
+      it.elStatus,
+      el('button', { type: 'button', class: 'btn-ikon kecil upload-buang', 'aria-label': `Buang ${it.nama}`, onclick: () => buangItem(it) }, ikon('tutup')),
+    );
+    kemasStatus(it);
+    return it.li;
+  }
+
+  function kemasStatus(it) {
+    it.li.dataset.status = it.status;
+    if (it.status === 'naik') isi(it.elStatus, `${Math.round(it.p * 100)}%`);
+    else if (it.status === 'siap') isi(it.elStatus, ikon('betul'));
+    else if (it.status === 'gagal') isi(it.elStatus, ikon('amaran'));
+    else it.elStatus.replaceChildren();
+  }
+
+  function buangItem(it) {
+    if ($('#dialog-upload').dataset.sibuk) return;
+    failUpload = failUpload.filter((x) => x !== it);
+    it.li.remove();
+    if (!failUpload.length) tutupDialog($('#dialog-upload'));
+    else paparUpload();
+  }
+
   function paparUpload() {
-    $('#senarai-upload').replaceChildren(...failUpload.map((it, i) => el('li', {},
-      el('span', { class: 'fail-nama' }, `${ikonFail({ nama: it.nama, jenis: it.fail.type || '' })} `,
-        it.folder && el('b', {}, `${it.folder} / `), it.nama),
-      el('span', { class: 'pudar kecil' }, saiz(it.fail.size)),
-      el('button', {
-        type: 'button', class: 'btn ikon kecil', title: 'Buang', 'aria-label': 'Buang',
-        onclick: () => { failUpload.splice(i, 1); paparUpload(); if (!failUpload.length) $('#dialog-upload').close(); },
-      }, '✕'),
-    )));
-    // Pilihan folder hanya perlu untuk fail yang bukan dari folder
-    const adaLepas = failUpload.some((it) => !it.folder);
-    $('#label-folder-upload').hidden = !adaLepas;
+    const lepas = failUpload.some((it) => !it.folder);
+    $('#label-folder-upload').hidden = !lepas;
     $('#nota-folder-upload').hidden = !failUpload.some((it) => it.folder);
+    const baki = failUpload.filter((it) => it.status !== 'siap').length;
     const jumlahFolder = new Set(failUpload.filter((it) => it.folder).map((it) => it.folder)).size;
-    $('#btn-mula-upload').textContent = jumlahFolder
-      ? `Upload ${failUpload.length} fail (${jumlahFolder} folder)`
-      : `Upload ${failUpload.length} fail`;
+    $('#tajuk-upload').textContent = jumlahFolder ? `Upload ${jumlahFolder} folder` : 'Upload fail';
+    if (!$('#dialog-upload').dataset.sibuk) $('#btn-mula-upload').textContent = `Upload ${baki} fail`;
   }
 
   // Baca isi folder yang diseret masuk (termasuk subfolder)
@@ -1257,81 +1232,89 @@
 
   async function mulaUpload(ev) {
     ev.preventDefault();
+    const d = $('#dialog-upload');
+    if (d.dataset.sibuk || !failUpload.length) return;
     const btn = $('#btn-mula-upload');
     const r = $('#ralat-upload');
-    r.hidden = true;
-    btn.disabled = true;
-    const jumlah = failUpload.length;
-    const jumlahBait = failUpload.reduce((n, it) => n + it.fail.size, 0) || 1;
-    let baitSiap = 0;
     const bar = $('#kemajuan-upload');
     const isiBar = bar.firstElementChild;
-    isiBar.style.width = '0%';
+    const jumlahBait = failUpload.reduce((n, it) => n + it.fail.size, 0) || 1;
+    const kemasBar = (semasa) => {
+      const siap = failUpload.reduce((n, it) => n + (it.status === 'siap' ? it.fail.size : 0), 0);
+      isiBar.style.width = `${Math.min(100, ((siap + (semasa ? semasa.fail.size * semasa.p : 0)) / jumlahBait) * 100)}%`;
+    };
+    d.dataset.sibuk = '1';
+    btn.disabled = true;
+    r.hidden = true;
     bar.hidden = false;
+    kemasBar();
     const folderDibuat = new Set();
     let berjaya = 0;
     let folderTerakhir = '';
+    let it = null;
     try {
-      btn.textContent = 'Sekejap…';
       const pilihan = $('#borang-upload').elements.folder.value.trim() || 'Utama';
-      while (failUpload.length) {
-        const it = failUpload[0];
+      const jumlah = failUpload.filter((x) => x.status !== 'siap').length;
+      while ((it = failUpload.find((x) => x.status !== 'siap'))) {
+        isi(btn, el('span', { class: 'pemusing' }), el('span', {}, `Memuat naik ${berjaya + 1}/${jumlah}`));
         const folderId = await idFolder(it.folder || pilihan);
-        if (it.folder) folderDibuat.add(it.folder);
-        const label = `Upload ${berjaya + 1}/${jumlah}`;
-        btn.textContent = `${label}…`;
-        const id = await uploadSatu(it, folderId, (p) => {
-          btn.textContent = `${label} · ${Math.round(p * 100)}%`;
-          isiBar.style.width = `${Math.min(100, ((baitSiap + it.fail.size * p) / jumlahBait) * 100)}%`;
-        });
-        baitSiap += it.fail.size;
-        isiBar.style.width = `${Math.min(100, (baitSiap / jumlahBait) * 100)}%`;
+        it.status = 'naik';
+        it.p = 0;
+        kemasStatus(it);
+        if (it.li.scrollIntoView) it.li.scrollIntoView({ block: 'nearest' });
+        const semasa = it;
+        const id = await uploadSatu(it, folderId, (p) => { semasa.p = p; kemasStatus(semasa); kemasBar(semasa); });
+        it.status = 'siap';
+        kemasStatus(it);
+        kemasBar();
         // Pratonton terus dari fail tempatan, sebab Google ambil masa untuk buat thumbnail
         if (id && (it.fail.type || '').startsWith('image/')) thumbLokal.set(id, URL.createObjectURL(it.fail));
+        if (it.folder) folderDibuat.add(it.folder);
         folderTerakhir = folderId;
-        failUpload.shift();
         berjaya++;
-        paparUpload();
       }
-      letupanDari(btn);
-      await tidur(bolehGerak ? 350 : 0);
-      $('#dialog-upload').close();
+      it = null;
+      await tidur(bolehGerak ? 450 : 0);
+      delete d.dataset.sibuk;
+      tutupDialog(d);
       animasiSeterusnya = true;
       if (folderDibuat.size) {
         folderAktif = '';
-        toast(`${berjaya} fail diupload ke ${[...folderDibuat].join(', ')} ✔`);
+        toast(`${berjaya} fail diupload ke ${[...folderDibuat].join(', ')}`, 'ok');
       } else {
         if (folderAktif) folderAktif = folderTerakhir === akarId ? '' : folderTerakhir;
-        toast(`${berjaya} fail diupload ke ${namaFolder(folderTerakhir)} ✔`);
+        toast(`${berjaya} fail diupload ke ${namaFolder(folderTerakhir)}`, 'ok');
       }
     } catch (e) {
+      if (it) { it.status = 'gagal'; kemasStatus(it); }
       r.textContent = `${berjaya ? `${berjaya} fail berjaya. ` : ''}Gagal: ${mesejRalat(e)}`;
       r.hidden = false;
     } finally {
+      delete d.dataset.sibuk;
       btn.disabled = false;
-      paparUpload();
+      const baki = failUpload.filter((x) => x.status !== 'siap').length;
+      btn.textContent = baki ? `Cuba lagi (${baki} fail)` : 'Upload';
       if (berjaya && token) await muat();
     }
   }
 
   // ---------- Acara ----------
   $('#btn-urus-profil').addEventListener('click', () => { modUrus = !modUrus; paparProfil(); });
-  $('#btn-tukar-profil').addEventListener('click', keluarProfil);
+  $('#btn-profil-menu').addEventListener('click', (ev) => menuProfil(ev.currentTarget));
+  $('#btn-logo').addEventListener('click', () => { $('#cari').value = ''; bukaPaparan(''); });
+  $('#btn-baru').addEventListener('click', (ev) => menuBaru(ev.currentTarget));
   $('#borang-profil').addEventListener('submit', simpanProfil);
-  $('#borang-profil').elements.nama.addEventListener('input', () => { if (pilihanProfil.gambar) paparPilihanProfil(); });
+  $('#borang-profil').elements.nama.addEventListener('input', () => { if (!pilihanProfil.gambar) paparPilihanProfil(false); });
   $('#btn-pilih-gambar').addEventListener('click', () => $('#input-gambar-profil').click());
   $('#input-gambar-profil').addEventListener('change', pilihGambarProfil);
-  $('#btn-buang-gambar').addEventListener('click', () => { pilihanProfil.gambar = ''; gambarBerubah = true; paparPilihanProfil(); });
+  $('#btn-buang-gambar').addEventListener('click', () => { pilihanProfil.gambar = ''; gambarBerubah = true; paparPilihanProfil(true); });
   $('#btn-padam-profil').addEventListener('click', padamProfil);
-  $('#btn-latar').addEventListener('click', bukaDialogLatar);
   $('#btn-pilih-latar').addEventListener('click', () => $('#input-latar').click());
   $('#input-latar').addEventListener('change', pilihLatar);
   $('#btn-lalai-latar').addEventListener('click', () => { latarBaru = ''; paparPratontonLatar(''); });
   $('#borang-latar').addEventListener('submit', simpanLatar);
   $('#borang-pin').addEventListener('submit', hantarPin);
   $('#dialog-pin').addEventListener('close', () => { if (pinSelesai) { pinSelesai.gagal('batal'); pinSelesai = null; } });
-  $('#btn-upload').addEventListener('click', () => $('#input-fail').click());
-  $('#btn-upload-folder').addEventListener('click', () => $('#input-folder').click());
   $('#input-fail').addEventListener('change', (ev) => { bukaUpload([...ev.target.files].map(itemFail)); ev.target.value = ''; });
   $('#input-folder').addEventListener('change', (ev) => {
     bukaUpload([...ev.target.files].map((f) => itemDariLaluan(f, f.webkitRelativePath || f.name)));
@@ -1340,15 +1323,34 @@
   $('#input-fail-tambah').addEventListener('change', (ev) => { tambahItemUpload([...ev.target.files].map(itemFail)); ev.target.value = ''; });
   $('#borang-upload').addEventListener('submit', mulaUpload);
   $('#borang-teks').addEventListener('submit', hantarTeks);
-  $('#btn-nama-folder').addEventListener('click', tukarNamaFolder);
-  $('#btn-padam-folder').addEventListener('click', padamFolder);
-  document.querySelectorAll('[data-tutup]').forEach((b) => b.addEventListener('click', () => b.closest('dialog').close()));
-  ['#cari', '#susun'].forEach((s) => $(s).addEventListener('input', papar));
+  $('#susun').addEventListener('change', () => { animasiSeterusnya = true; papar(); });
+  let tundaCari;
+  $('#cari').addEventListener('input', () => { clearTimeout(tundaCari); tundaCari = setTimeout(papar, 120); });
+  $('#cari').addEventListener('keydown', (ev) => { if (ev.key === 'Escape') { ev.target.value = ''; papar(); } });
+  document.querySelectorAll('.segmen-btn').forEach((b) => b.addEventListener('click', () => {
+    if (modPaparan === b.dataset.paparan) return;
+    modPaparan = b.dataset.paparan;
+    simpanTempatan('upsi-paparan', modPaparan);
+    aturMod();
+    animasiSeterusnya = true;
+    if (token && semua) papar();
+  }));
+  // Pintasan papan kekunci: "/" untuk cari
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === '/' && !$('#skrin-utama').hidden && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) && !document.querySelector('dialog[open]')) {
+      ev.preventDefault();
+      $('#cari').focus();
+    }
+    if (ev.key === 'Escape' && document.documentElement.classList.contains('ada-modal')) {
+      const d = [...document.querySelectorAll('dialog[open]')].pop();
+      if (d) tutupDialog(d);
+    }
+  });
 
   // Seret & lepas fail ke mana-mana bahagian skrin (hanya bila dalam profil)
   const lapisan = $('#lapisan-seret');
   let kiraSeret = 0;
-  const bolehSeret = (ev) => token && [...(ev.dataTransfer?.types || [])].includes('Files');
+  const bolehSeret = (ev) => token && [...((ev.dataTransfer && ev.dataTransfer.types) || [])].includes('Files');
   window.addEventListener('dragenter', (ev) => {
     if (!bolehSeret(ev)) return;
     ev.preventDefault();
@@ -1366,14 +1368,14 @@
     try {
       items = await itemDariSeret(ev.dataTransfer);
     } catch (e) {
-      toast(mesejRalat(e), true);
+      toast(mesejRalat(e), 'ralat');
       return;
     }
     if ($('#dialog-upload').open) tambahItemUpload(items);
     else bukaUpload(items);
   });
 
-  Galaksi.mulakan();
+  aturMod();
   kenalPasti();
   muatProfil();
 })();
