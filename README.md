@@ -8,7 +8,9 @@ Storan fail peribadi, macam Google Drive versi ringkas. Upload fail kerja atau f
 - **Folder**: buat folder sendiri (cth. Kerja, Peribadi). Tukar nama atau padam folder.
 - **Urus fail**: buka, muat turun, tukar nama, pindah ke folder lain, padam.
 - **Pratonton gambar**, carian nama fail, dan susun ikut terbaru, nama atau saiz.
-- Bahasa Melayu, sesuai untuk telefon dan desktop, ada mod gelap.
+- Bahasa Melayu, sesuai untuk telefon dan desktop.
+- **Animasi 3D** (versi Google Drive): latar galaksi 3D yang berputar (canvas, tajam di skrin 4K/Retina, bergerak ikut tetikus/kecondongan telefon), kad kaca yang condong 3D, peralihan profil gaya Netflix, kad masuk berperingkat, konfeti bila upload berjaya.
+- **Latar belakang sendiri**: setiap profil boleh upload gambar latar (sehingga 4K / 3840px) melalui butang 🎨. Tanpa gambar, galaksi 3D lalai digunakan.
 
 Ada dua versi:
 
@@ -17,7 +19,7 @@ Ada dua versi:
 | Folder | `apps-script/` | `public/lama/`, `supabase/` |
 | Ruang | Ikut kuota Google Drive akaun kau | 1 GB percuma |
 | Saiz fail | Tiada had praktikal (dihantar dalam cebisan 8MB) | 50 MB |
-| Alamat | [Web app MOE](https://script.google.com/a/macros/moe-dl.edu.my/s/AKfycbxoYc8-PWiF9fhsElI5qLJ5NndhSPgtyp1f2TGRiLpMPJVGiQDoxVTStflm_3x15O_eRw/exec) (juga `dynoz769.github.io/UPSI-DATA`, yang terus bawa ke sini) | `dynoz769.github.io/UPSI-DATA/lama/` |
+| Alamat | [Web app](https://script.google.com/macros/s/AKfycbwyjEeiiLCLWmnDWMh_CVKp81ZiwsTlP8GgzsFzNrTnFCP6WkCdL9aIVKnlOl-ShXzW1g/exec) (juga `dynoz769.github.io/UPSI-DATA`, yang terus bawa ke sini) | `dynoz769.github.io/UPSI-DATA/lama/` |
 
 ---
 
@@ -32,12 +34,35 @@ UPSI-DATA/
       laporan.pdf
   Sara/
     ...
-  _gambar-profil/  ← gambar profil (dikecilkan ke 256px)
+  _gambar-profil/  ← gambar profil (256px) dan latar belakang profil (sehingga 3840px)
 ```
+
+### Kod sumber
+`Index.html` **dijana** daripada `apps-script/src/` (`body.html`, `gaya.css`, `app.js`). Untuk ubah rupa atau fungsi, edit fail dalam `src/`, kemudian jalankan:
+
+```bash
+python3 apps-script/bina.py
+```
+
+Tampal `Index.html` yang baru ke Apps Script seperti biasa.
+
+### Animasi & prestasi
+- Galaksi dilukis dalam `<canvas>` ikut `devicePixelRatio` (tajam pada skrin 4K) dan berhenti bila tab tersorok.
+- Kualiti adaptif: kalau peranti tak mampu ~40fps, jumlah bintang dan resolusi diturunkan secara automatik.
+- Pengguna yang set *Kurangkan gerakan* (prefers-reduced-motion) dapat paparan statik tanpa animasi.
 
 Bila website dibuka, skrin **"Siapa yang guna?"** keluar dan kau pilih profil. Setiap profil hanya nampak fail sendiri. Tekan **Tambah Profil** untuk buat profil baru (nama, gambar atau ikon, warna, PIN pilihan). Tekan **Urus Profil** dan pilih profil untuk tukar nama/gambar atau padam profil (perlu PIN kalau profil berkunci).
 
 **Upload Folder**: folder yang dipilih atau diseret jadi folder dengan nama sama dalam profil. Subfolder diratakan, cth. `hari2/hutan.png` jadi `hari2 - hutan.png`.
+
+### 👤 Siapa buat / upload
+Setiap profil, folder dan fail direkod **siapa yang buat atau upload**. Rekod ni dipaparkan dalam website (👤 pada kad, "Dibuat oleh" dalam Edit Profil) dan juga disimpan dalam *description* fail/folder di Google Drive.
+
+Disebabkan web app berjalan sebagai "Execute as: Me", Google **hanya dedahkan email** untuk:
+- pemilik script, dan
+- akaun dari **domain yang sama** dengan pemilik (cth. semua `@moe-dl.edu.my` kalau di-deploy dengan akaun MOE).
+
+Untuk akaun lain (cth. Gmail biasa), email disorok oleh Google. Website rekod **"Tanpa nama #kod"**: kod yang sama untuk orang yang sama, jadi masih boleh dibezakan siapa upload apa. Fail lama sebelum ciri ni tiada rekod.
 
 ### 🔒 Keselamatan
 - Website ni **tiada login**. Sesiapa yang ada link website boleh buka skrin profil.
